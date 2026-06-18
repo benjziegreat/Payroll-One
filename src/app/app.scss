@@ -1,0 +1,57 @@
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.topbar__brand {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.topbar__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.topbar__nav a {
+  color: var(--color-text-muted);
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.topbar__nav a.active {
+  color: var(--color-text);
+}
+
+.topbar__nav .btn {
+  width: auto;
+}
+
+.shell__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 480px) {
+  .topbar {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .topbar__nav {
+    gap: var(--space-3);
+  }
+}

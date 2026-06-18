@@ -1,0 +1,61 @@
+<div class="backdrop" (click)="close()">
+  <div class="modal card stack" (click)="$event.stopPropagation()">
+    <div class="modal__header">
+      <h2>Confirm {{ actionLabel() }}</h2>
+      <button class="btn btn-ghost modal__close" type="button" (click)="close()">✕</button>
+    </div>
+
+    @if (!selectedMethod()) {
+      <p class="text-muted text-sm">Choose how you'd like to verify it's you.</p>
+      <div class="stack">
+        @for (method of availableMethods(); track method) {
+          <button class="btn" type="button" (click)="choose(method)">
+            {{ method === 'face' ? 'Scan my face' : 'Use fingerprint / device biometric' }}
+          </button>
+        }
+      </div>
+    }
+
+    @if (selectedMethod() === 'face') {
+      <div class="face-view stack">
+        <div class="face-view__frame">
+          <video #video playsinline muted></video>
+        </div>
+
+        @if (errorMessage()) {
+          <p class="error">{{ errorMessage() }}</p>
+        }
+
+        @switch (status()) {
+          @case ('camera') {
+            <button class="btn btn-primary" type="button" (click)="scanFace()">Scan face</button>
+          }
+          @case ('scanning') {
+            <p class="text-muted text-sm text-center">Looking for your face…</p>
+          }
+          @case ('verifying') {
+            <p class="text-muted text-sm text-center">Verifying…</p>
+          }
+          @case ('error') {
+            <button class="btn btn-primary" type="button" (click)="retry()">Try again</button>
+          }
+        }
+
+        <button class="btn btn-ghost" type="button" (click)="back()">Choose a different method</button>
+      </div>
+    }
+
+    @if (selectedMethod() === 'fingerprint') {
+      <div class="stack text-center">
+        @if (status() === 'verifying') {
+          <p class="text-muted text-sm">Follow your device's prompt to confirm your fingerprint or face.</p>
+        }
+        @if (status() === 'error') {
+          <p class="error">{{ errorMessage() }}</p>
+          <button class="btn btn-primary" type="button" (click)="retry()">Try again</button>
+        }
+        <button class="btn btn-ghost" type="button" (click)="back()">Choose a different method</button>
+      </div>
+    }
+  </div>
+</div>

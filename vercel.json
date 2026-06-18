@@ -1,0 +1,5 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist/payroll-one/browser",
+  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
+}

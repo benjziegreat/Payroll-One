@@ -1,0 +1,51 @@
+<div class="container">
+  <div class="stack">
+    <div class="stack" style="gap: 4px">
+      <h1>Hi, {{ fullName() }}</h1>
+      <p class="text-muted text-sm">Confirm your identity to clock in or out.</p>
+    </div>
+
+    @if (!loading()) {
+      <div class="card stack text-center">
+        <span class="badge" [class.badge--success]="lastAction() === 'login'">
+          {{ lastAction() === 'login' ? 'Clocked in' : lastAction() === 'logout' ? 'Clocked out' : 'No activity yet' }}
+        </span>
+
+        @if (lastAt()) {
+          <p class="text-muted text-sm">Last event: {{ lastAt() | date: 'medium' }}</p>
+        }
+
+        @if (justLogged()) {
+          <p class="success">
+            {{ justLogged()!.action === 'login' ? 'Clocked in' : 'Clocked out' }} via
+            {{ justLogged()!.method === 'face' ? 'face recognition' : 'fingerprint' }}.
+          </p>
+        }
+
+        @if (availableMethods().length > 0) {
+          <button class="btn btn-primary" type="button" (click)="openModal()">
+            {{ nextAction() === 'login' ? 'Clock In' : 'Clock Out' }}
+          </button>
+        } @else {
+          <p class="text-muted text-sm">No biometric method enrolled yet.</p>
+          <button class="btn" type="button" (click)="manageEnrollment()">Enroll now</button>
+        }
+      </div>
+
+      @if (availableMethods().length > 0) {
+        <button class="btn btn-ghost" type="button" (click)="manageEnrollment()">
+          Manage enrolled biometrics
+        </button>
+      }
+    }
+  </div>
+
+  @if (modalOpen()) {
+    <app-biometric-modal
+      [action]="nextAction()"
+      [availableMethods]="availableMethods()"
+      (success)="onSuccess($event)"
+      (cancel)="onCancel()"
+    />
+  }
+</div>

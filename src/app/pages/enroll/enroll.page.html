@@ -1,0 +1,70 @@
+<div class="container">
+  <div class="stack">
+    <div class="stack" style="gap: 4px">
+      <h1>Enroll your biometrics</h1>
+      <p class="text-muted text-sm">
+        Set up at least one method below. You can add the other later from this page.
+      </p>
+    </div>
+
+    <div class="card stack">
+      <div class="card__title">
+        <h2>Face recognition</h2>
+        @if (faceEnrolled()) {
+          <span class="badge badge--success">Enrolled</span>
+        }
+      </div>
+
+      @if (!faceCameraOpen()) {
+        <button class="btn" type="button" (click)="openFaceCamera()">
+          {{ faceEnrolled() ? 'Re-enroll face' : 'Enroll face' }}
+        </button>
+      } @else {
+        <div class="face-frame">
+          <video #video playsinline muted></video>
+        </div>
+        @if (faceError()) {
+          <p class="error">{{ faceError() }}</p>
+        }
+        <div class="row">
+          <button class="btn btn-primary" type="button" [disabled]="faceBusy()" (click)="captureFace()">
+            {{ faceBusy() ? 'Capturing…' : 'Capture face' }}
+          </button>
+          <button class="btn btn-ghost" type="button" (click)="closeFaceCamera()">Cancel</button>
+        </div>
+      }
+    </div>
+
+    <div class="card stack">
+      <div class="card__title">
+        <h2>Fingerprint / device biometric</h2>
+        @if (fingerprintEnrolled()) {
+          <span class="badge badge--success">Enrolled</span>
+        }
+      </div>
+
+      @if (!webauthnSupported) {
+        <p class="text-muted text-sm">Not supported on this browser or device.</p>
+      } @else {
+        <p class="text-muted text-sm">
+          Uses your device's built-in fingerprint, Face ID, or Windows Hello.
+        </p>
+        @if (fingerprintError()) {
+          <p class="error">{{ fingerprintError() }}</p>
+        }
+        <button class="btn" type="button" [disabled]="fingerprintBusy()" (click)="enrollFingerprint()">
+          {{ fingerprintBusy() ? 'Waiting for device…' : fingerprintEnrolled() ? 'Re-enroll fingerprint' : 'Enroll fingerprint' }}
+        </button>
+      }
+    </div>
+
+    <button
+      class="btn btn-primary"
+      type="button"
+      [disabled]="!faceEnrolled() && !fingerprintEnrolled()"
+      (click)="continue()"
+    >
+      Continue to dashboard
+    </button>
+  </div>
+</div>

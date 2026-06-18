@@ -1,0 +1,31 @@
+:host {
+  display: flex;
+  flex: 1;
+  justify-content: center;
+}
+
+.card__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.face-frame {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: #000;
+}
+
+.face-frame video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.row {
+  display: flex;
+  gap: var(--space-3);
+}

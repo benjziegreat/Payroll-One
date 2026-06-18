@@ -1,0 +1,25 @@
+<div class="container container--wide">
+  <div class="stack">
+    <h1>Attendance history</h1>
+
+    @if (loading()) {
+      <p class="text-muted text-sm">Loading…</p>
+    } @else if (logs().length === 0) {
+      <p class="text-muted text-sm">No attendance records yet.</p>
+    } @else {
+      <div class="log-list">
+        @for (log of logs(); track log.id) {
+          <div class="log-row card">
+            <span class="badge" [class.badge--success]="log.action === 'login'">
+              {{ log.action === 'login' ? 'Clock in' : 'Clock out' }}
+            </span>
+            <span class="log-row__method text-muted text-sm">
+              {{ log.method === 'face' ? 'Face recognition' : 'Fingerprint' }}
+            </span>
+            <span class="log-row__time text-sm">{{ log.created_at | date: 'medium' }}</span>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</div>

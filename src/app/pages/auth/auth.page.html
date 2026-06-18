@@ -1,0 +1,82 @@
+<div class="container">
+  <div class="card stack">
+    <div class="stack" style="gap: 4px">
+      <h1>Payroll One</h1>
+      <p class="text-muted text-sm">Biometric attendance, secured by Supabase.</p>
+    </div>
+
+    <div class="tabs">
+      <button
+        type="button"
+        class="tabs__tab"
+        [class.tabs__tab--active]="mode() === 'signin'"
+        (click)="setMode('signin')"
+      >
+        Sign in
+      </button>
+      <button
+        type="button"
+        class="tabs__tab"
+        [class.tabs__tab--active]="mode() === 'signup'"
+        (click)="setMode('signup')"
+      >
+        Create account
+      </button>
+    </div>
+
+    <form class="stack" (ngSubmit)="submit()">
+      @if (mode() === 'signup') {
+        <div class="field">
+          <label for="fullName">Full name</label>
+          <input
+            id="fullName"
+            class="input"
+            type="text"
+            name="fullName"
+            [(ngModel)]="fullName"
+            required
+            autocomplete="name"
+          />
+        </div>
+      }
+
+      <div class="field">
+        <label for="email">Email</label>
+        <input
+          id="email"
+          class="input"
+          type="email"
+          name="email"
+          [(ngModel)]="email"
+          required
+          autocomplete="email"
+        />
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <input
+          id="password"
+          class="input"
+          type="password"
+          name="password"
+          [(ngModel)]="password"
+          required
+          minlength="6"
+          autocomplete="current-password"
+        />
+      </div>
+
+      @if (error()) {
+        <p class="error">{{ error() }}</p>
+      }
+      @if (info()) {
+        <p class="success">{{ info() }}</p>
+      }
+
+      <button class="btn btn-primary" type="submit" [disabled]="loading()">
+        {{ loading() ? 'Please wait…' : mode() === 'signin' ? 'Sign in' : 'Create account' }}
+      </button>
+    </form>
+  </div>
+</div>
