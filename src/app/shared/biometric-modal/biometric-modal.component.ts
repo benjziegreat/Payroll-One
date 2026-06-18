@@ -69,6 +69,7 @@ export class BiometricModalComponent implements OnInit, OnDestroy {
     if (!video) return;
     try {
       this.stream = await this.faceService.startCamera(video);
+      this.scanFace();
     } catch {
       this.status.set('error');
       this.errorMessage.set('Camera access was denied or is unavailable.');

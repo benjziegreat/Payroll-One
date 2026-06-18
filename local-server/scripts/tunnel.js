@@ -13,17 +13,101 @@ const https = require('https');
 const { spawn, spawnSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
+const PROJECT_ROOT = path.join(ROOT, '..');
 const BIN_DIR = path.join(ROOT, 'bin');
 const PID_FILE = path.join(ROOT, '.tunnel.pid');
 const URL_FILE = path.join(ROOT, '.tunnel-url.txt');
 const LOG_FILE = path.join(ROOT, '.tunnel.log');
+const SERVER_LOG_FILE = path.join(ROOT, '.server.log');
 const TARGET_URL = process.env.TUNNEL_TARGET_URL || 'https://localhost:8443';
 
 const isWindows = process.platform === 'win32';
 const binaryPath = path.join(BIN_DIR, isWindows ? 'cloudflared.exe' : 'cloudflared');
+const TARGET_PORT = new URL(TARGET_URL).port || '443';
 
 function log(message) {
   console.log(`[tunnel] ${message}`);
+}
+
+function isPortListening(port) {
+  if (isWindows) {
+    const result = spawnSync('netstat', ['-ano']);
+    return new RegExp(`:${port}\\s+\\S+\\s+LISTENING`).test(result.stdout.toString());
+  }
+  const result = spawnSync('lsof', ['-ti', `tcp:${port}`]);
+  return result.stdout.toString().trim().length > 0;
+}
+
+function waitForPort(port, attempt = 0) {
+  return new Promise((resolve, reject) => {
+    const check = (n) => {
+      if (isPortListening(port)) {
+        resolve();
+        return;
+      }
+      if (n > 120) {
+        reject(new Error(`Timed out waiting for port ${port}.`));
+        return;
+      }
+      setTimeout(() => check(n + 1), 1000);
+    };
+    check(attempt);
+  });
+}
+
+async function ensureLocalServer(port) {
+  if (isPortListening(port)) {
+    log(`Local server already running on port ${port}.`);
+    return;
+  }
+
+  log('Local server not running — starting "npm run serve:https"...');
+  const out = fs.openSync(SERVER_LOG_FILE, 'w');
+  const child = spawn(isWindows ? 'npm.cmd' : 'npm', ['run', 'serve:https'], {
+    cwd: PROJECT_ROOT,
+    detached: true,
+    shell: isWindows,
+    stdio: ['ignore', out, out],
+  });
+  child.unref();
+
+  log('Waiting for local server to be ready (this may take a while during build)...');
+  await waitForPort(port);
+  log(`Local server is up on port ${port}.`);
+}
+
+function killPort(port) {
+  if (isWindows) {
+    const result = spawnSync('netstat', ['-ano']);
+    const pids = new Set();
+    for (const line of result.stdout.toString().split('\n')) {
+      const match = line.match(new RegExp(`:${port}\\s+\\S+\\s+LISTENING\\s+(\\d+)`));
+      if (match) pids.add(match[1]);
+    }
+    if (pids.size === 0) {
+      log(`No process found listening on port ${port}.`);
+      return;
+    }
+    for (const pid of pids) {
+      spawnSync('taskkill', ['/PID', pid, '/T', '/F']);
+      log(`Killed process on port ${port} (PID ${pid}).`);
+    }
+  } else {
+    const result = spawnSync('lsof', ['-ti', `tcp:${port}`]);
+    const pids = result.stdout.toString().split('\n').filter(Boolean);
+    if (pids.length === 0) {
+      log(`No process found listening on port ${port}.`);
+      return;
+    }
+    for (const pid of pids) {
+      try {
+        process.kill(Number(pid), 'SIGTERM');
+        log(`Killed process on port ${port} (PID ${pid}).`);
+      } catch (err) {
+        log(`Could not kill PID ${pid}: ${err.message}`);
+      }
+    }
+  }
 }
 
 function releaseAssetUrl() {
@@ -116,6 +200,13 @@ async function start() {
     fs.unlinkSync(PID_FILE);
   }
 
+  try {
+    await ensureLocalServer(TARGET_PORT);
+  } catch (err) {
+    log(`Could not start local server: ${err.message} — check ${SERVER_LOG_FILE}.`);
+    return;
+  }
+
   log(`Starting tunnel to ${TARGET_URL}...`);
   if (fs.existsSync(URL_FILE)) fs.unlinkSync(URL_FILE);
   const out = fs.openSync(LOG_FILE, 'w');
@@ -133,23 +224,24 @@ async function start() {
 function stop() {
   if (!fs.existsSync(PID_FILE)) {
     log('No tunnel is running (no PID file).');
-    return;
-  }
-
-  const pid = Number(fs.readFileSync(PID_FILE, 'utf8').trim());
-  try {
-    if (isWindows) {
-      spawnSync('taskkill', ['/PID', String(pid), '/T', '/F']);
-    } else {
-      process.kill(pid, 'SIGTERM');
+  } else {
+    const pid = Number(fs.readFileSync(PID_FILE, 'utf8').trim());
+    try {
+      if (isWindows) {
+        spawnSync('taskkill', ['/PID', String(pid), '/T', '/F']);
+      } else {
+        process.kill(pid, 'SIGTERM');
+      }
+      log(`Stopped tunnel (PID ${pid}).`);
+    } catch (err) {
+      log(`Could not stop PID ${pid}: ${err.message}`);
     }
-    log(`Stopped tunnel (PID ${pid}).`);
-  } catch (err) {
-    log(`Could not stop PID ${pid}: ${err.message}`);
+
+    fs.unlinkSync(PID_FILE);
+    if (fs.existsSync(URL_FILE)) fs.unlinkSync(URL_FILE);
   }
 
-  fs.unlinkSync(PID_FILE);
-  if (fs.existsSync(URL_FILE)) fs.unlinkSync(URL_FILE);
+  killPort(TARGET_PORT);
 }
 
 function status() {

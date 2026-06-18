@@ -1,0 +1,9 @@
+tunnel: 785b0c98-b8d2-463f-9430-fcae482a4ad2
+credentials-file: C:\Users\benjiePenol\.cloudflared\785b0c98-b8d2-463f-9430-fcae482a4ad2.json
+
+ingress:
+  - hostname: app.mobile-dtr.com
+    service: https://localhost:8443
+    originRequest:
+      noTLSVerify: true
+  - service: http_status:404
