@@ -1,4 +1,6 @@
 import { Injectable } from '@angular/core';
+import { environment } from '../../environments/environment';
+import { LocalApiService } from './local-api.service';
 import { SupabaseService } from './supabase.service';
 
 export type AttendanceAction = 'login' | 'logout';
@@ -14,9 +16,19 @@ export interface AttendanceLog {
 
 @Injectable({ providedIn: 'root' })
 export class AttendanceService {
-  constructor(private readonly supabase: SupabaseService) {}
+  private readonly isLocal = environment.backend === 'local';
+
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly localApi: LocalApiService,
+  ) {}
 
   async logEvent(userId: string, action: AttendanceAction, method: BiometricMethod) {
+    if (this.isLocal) {
+      await this.localApi.request('/attendance', { body: { action, method } });
+      return;
+    }
+
     const { error } = await this.supabase.client
       .from('attendance_logs')
       .insert({ user_id: userId, action, method });
@@ -24,6 +36,14 @@ export class AttendanceService {
   }
 
   async getHistory(userId: string, limit = 50): Promise<AttendanceLog[]> {
+    if (this.isLocal) {
+      const { logs } = await this.localApi.request<{ logs: AttendanceLog[] }>(
+        `/attendance?limit=${limit}`,
+        { method: 'GET' },
+      );
+      return logs;
+    }
+
     const { data, error } = await this.supabase.client
       .from('attendance_logs')
       .select('*')
@@ -35,6 +55,14 @@ export class AttendanceService {
   }
 
   async getLastAction(userId: string): Promise<AttendanceAction | null> {
+    if (this.isLocal) {
+      const { action } = await this.localApi.request<{ action: AttendanceAction | null }>(
+        '/attendance/last',
+        { method: 'GET' },
+      );
+      return action;
+    }
+
     const { data, error } = await this.supabase.client
       .from('attendance_logs')
       .select('action')

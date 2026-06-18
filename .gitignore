@@ -42,3 +42,12 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+.vercel
+
+# Local MySQL fallback server secrets/certs
+local-server/.env
+local-server/certs/
+local-server/bin/
+local-server/.tunnel.pid
+local-server/.tunnel-url.txt
+local-server/.tunnel.log

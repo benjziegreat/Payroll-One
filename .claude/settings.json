@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -o /tmp/router_login.html -D - \"http://192.168.254.254/\" --max-time 10)"
+    ]
+  }
+}

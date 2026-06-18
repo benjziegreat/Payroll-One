@@ -1,4 +1,6 @@
 import { Injectable } from '@angular/core';
+import { environment } from '../../environments/environment';
+import { LocalApiService } from './local-api.service';
 import { SupabaseService } from './supabase.service';
 
 const MODEL_URL = '/models';
@@ -8,8 +10,12 @@ const MATCH_THRESHOLD = 0.55;
 export class FaceService {
   private faceapi: typeof import('face-api.js') | null = null;
   private modelsLoaded = false;
+  private readonly isLocal = environment.backend === 'local';
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly localApi: LocalApiService,
+  ) {}
 
   private async ensureModelsLoaded() {
     if (this.modelsLoaded) return;
@@ -47,6 +53,11 @@ export class FaceService {
   }
 
   async saveEnrollment(userId: string, descriptor: Float32Array) {
+    if (this.isLocal) {
+      await this.localApi.request('/face/enroll', { body: { descriptor: Array.from(descriptor) } });
+      return;
+    }
+
     const { error } = await this.supabase.client
       .from('face_enrollments')
       .upsert({ user_id: userId, descriptor: Array.from(descriptor) });
@@ -54,6 +65,13 @@ export class FaceService {
   }
 
   async isEnrolled(userId: string): Promise<boolean> {
+    if (this.isLocal) {
+      const { enrolled } = await this.localApi.request<{ enrolled: boolean }>('/face/status', {
+        method: 'GET',
+      });
+      return enrolled;
+    }
+
     const { data, error } = await this.supabase.client
       .from('face_enrollments')
       .select('user_id')
@@ -65,6 +83,14 @@ export class FaceService {
 
   async verifyAgainstEnrollment(userId: string, liveDescriptor: Float32Array): Promise<boolean> {
     await this.ensureModelsLoaded();
+
+    if (this.isLocal) {
+      const { matched } = await this.localApi.request<{ matched: boolean }>('/face/verify', {
+        body: { descriptor: Array.from(liveDescriptor) },
+      });
+      return matched;
+    }
+
     const { data, error } = await this.supabase.client
       .from('face_enrollments')
       .select('descriptor')
