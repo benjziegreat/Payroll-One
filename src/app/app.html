@@ -9,7 +9,29 @@
         @if (isAdmin()) {
           <a routerLink="/admin/users" routerLinkActive="active">Users</a>
         }
-        <button class="btn btn-ghost" type="button" (click)="logout()">Sign out</button>
+
+        <div class="user-menu">
+          <button class="user-menu__trigger" type="button" (click)="toggleMenu()">
+            <span class="user-menu__avatar">
+              <app-user-avatar [photoUrl]="photoUrl()" [fullName]="fullName()" />
+              <span
+                class="user-menu__status"
+                [class.user-menu__status--online]="isOnline()"
+                [title]="isOnline() ? 'Online' : forcedOffline() ? 'Sync paused' : 'Offline'"
+              ></span>
+            </span>
+            <span class="user-menu__name">{{ fullName() }}</span>
+          </button>
+
+          @if (menuOpen()) {
+            <div class="user-menu__dropdown">
+              <button class="btn btn-ghost" type="button" (click)="toggleSync()">
+                {{ forcedOffline() ? 'Sync' : 'Unsync' }}
+              </button>
+              <button class="btn btn-ghost" type="button" (click)="logout()">Sign out</button>
+            </div>
+          }
+        </div>
       </nav>
     </header>
   }

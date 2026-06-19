@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, computed, signal } from '@angular/core';
 import {
   AttendanceService,
   type AttendanceAction,
@@ -10,6 +10,7 @@ const DB_NAME = 'payroll_one_offline';
 const DB_VERSION = 1;
 const STORE_NAME = 'pending_attendance';
 const RETRY_INTERVAL_MS = 15000;
+const FORCED_OFFLINE_KEY = 'payroll_one_forced_offline';
 
 export interface PendingAttendanceEntry {
   clientEventId: string;
@@ -61,6 +62,11 @@ function withStore<T>(
 @Injectable({ providedIn: 'root' })
 export class OfflineQueueService {
   readonly isOnline = signal(navigator.onLine);
+  /** Manual "work offline" override — independent of actual connectivity. */
+  readonly forcedOffline = signal(localStorage.getItem(FORCED_OFFLINE_KEY) === '1');
+  /** What the app actually does: send immediately, or queue. */
+  readonly effectiveOnline = computed(() => this.isOnline() && !this.forcedOffline());
+
   readonly pendingCount = signal(0);
   readonly syncing = signal(false);
 
@@ -69,15 +75,22 @@ export class OfflineQueueService {
   constructor(private readonly attendanceService: AttendanceService) {
     window.addEventListener('online', () => {
       this.isOnline.set(true);
-      this.flush();
+      if (this.effectiveOnline()) this.flush();
     });
     window.addEventListener('offline', () => this.isOnline.set(false));
 
     this.refreshPendingCount();
-    if (this.isOnline()) this.flush();
+    if (this.effectiveOnline()) this.flush();
     setInterval(() => {
-      if (this.isOnline()) this.flush();
+      if (this.effectiveOnline()) this.flush();
     }, RETRY_INTERVAL_MS);
+  }
+
+  /** Manually toggle "work offline" — queues everything until switched back. */
+  setForcedOffline(forced: boolean) {
+    this.forcedOffline.set(forced);
+    localStorage.setItem(FORCED_OFFLINE_KEY, forced ? '1' : '0');
+    if (!forced && this.isOnline()) this.flush();
   }
 
   /** Try to send immediately; if that fails for any reason, queue it for later. */
@@ -89,7 +102,7 @@ export class OfflineQueueService {
     occurredAt: string,
     clientEventId: string,
   ): Promise<{ queued: boolean }> {
-    if (this.isOnline()) {
+    if (this.effectiveOnline()) {
       try {
         await this.attendanceService.logEvent(userId, action, method, position, {
           occurredAt,
@@ -121,7 +134,7 @@ export class OfflineQueueService {
   }
 
   async flush() {
-    if (this.flushing) return;
+    if (this.flushing || this.forcedOffline()) return;
     this.flushing = true;
     this.syncing.set(true);
     try {
