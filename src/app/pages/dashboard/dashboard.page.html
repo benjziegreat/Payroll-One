@@ -1,9 +1,56 @@
 <div class="container">
   <div class="stack">
-    <div class="stack" style="gap: 4px">
-      <h1>Hi, {{ fullName() }}</h1>
-      <p class="text-muted text-sm">Confirm your identity to clock in or out.</p>
+    <div class="profile-header">
+      <app-user-avatar [photoUrl]="photoUrl()" [fullName]="fullName() ?? ''" />
+      <div class="stack" style="gap: 4px">
+        <h1>Hi, {{ fullName() }}</h1>
+        <p class="text-muted text-sm">Confirm your identity to clock in or out.</p>
+      </div>
     </div>
+
+    @if (!isOnline() || pendingSyncCount() > 0) {
+      <p class="badge" [class.badge--success]="isOnline()">
+        @if (!isOnline()) {
+          Offline — clock in/out will keep working and sync automatically once you're back online.
+        } @else if (syncing()) {
+          Syncing {{ pendingSyncCount() }} pending {{ pendingSyncCount() === 1 ? 'entry' : 'entries' }}…
+        } @else {
+          {{ pendingSyncCount() }} {{ pendingSyncCount() === 1 ? 'entry' : 'entries' }} waiting to sync.
+        }
+      </p>
+    }
+
+    @if (!photoCameraOpen()) {
+      <div class="row">
+        <label class="btn btn-ghost photo-upload">
+          {{ photoUploading() ? 'Uploading…' : photoUrl() ? 'Change profile photo' : 'Add profile photo' }}
+          <input
+            type="file"
+            accept="image/png, image/jpeg, image/webp"
+            [disabled]="photoUploading()"
+            (change)="onPhotoSelected($event)"
+          />
+        </label>
+        <button class="btn btn-ghost" type="button" [disabled]="photoUploading()" (click)="openPhotoCamera()">
+          Take photo
+        </button>
+      </div>
+    } @else {
+      <div class="camera-frame">
+        <video #photoVideo playsinline muted></video>
+      </div>
+      <div class="row">
+        <button class="btn btn-primary" type="button" [disabled]="photoUploading()" (click)="capturePhoto()">
+          {{ photoUploading() ? 'Uploading…' : 'Capture' }}
+        </button>
+        <button class="btn btn-ghost" type="button" [disabled]="photoUploading()" (click)="closePhotoCamera()">
+          Cancel
+        </button>
+      </div>
+    }
+    @if (photoError()) {
+      <p class="error">{{ photoError() }}</p>
+    }
 
     @if (!loading()) {
       <div class="card stack text-center">
@@ -19,11 +66,37 @@
           <p class="success">
             {{ justLogged()!.action === 'login' ? 'Clocked in' : 'Clocked out' }} via
             {{ justLogged()!.method === 'face' ? 'face recognition' : 'fingerprint' }}.
+            @if (justLogged()!.queued) {
+              Saved offline — will sync automatically once you're back online.
+            }
           </p>
         }
 
+        @if (officeLocation()) {
+          @if (distanceLabel() !== null) {
+            <p [class]="withinRange() ? 'success' : 'error'">
+              {{ distanceLabel() }} from office
+              @switch (rangeStatus()) {
+                @case ('too-close') {
+                  — too close, must be {{ geofenceMinLabel }}–{{ geofenceMaxLabel }} away to clock in/out
+                }
+                @case ('too-far') {
+                  — too far, must be {{ geofenceMinLabel }}–{{ geofenceMaxLabel }} away to clock in/out
+                }
+                @case ('in-range') {
+                  — in range
+                }
+              }
+            </p>
+          } @else if (geoError()) {
+            <p class="error">Location unavailable: {{ geoError() }}</p>
+          } @else {
+            <p class="text-muted text-sm">Locating you…</p>
+          }
+        }
+
         @if (availableMethods().length > 0) {
-          <button class="btn btn-primary" type="button" (click)="openModal()">
+          <button class="btn btn-primary" type="button" (click)="openModal()" [disabled]="!withinRange()">
             {{ nextAction() === 'login' ? 'Clock In' : 'Clock Out' }}
           </button>
         } @else {
@@ -36,6 +109,13 @@
         <button class="btn btn-ghost" type="button" (click)="manageEnrollment()">
           Manage enrolled biometrics
         </button>
+      }
+
+      <button class="btn btn-ghost" type="button" (click)="setOfficeLocationHere()" [disabled]="settingOfficeLocation()">
+        {{ officeLocation() ? 'Update office location to here' : 'Set this location as office' }}
+      </button>
+      @if (officeLocationMessage()) {
+        <p class="text-muted text-sm">{{ officeLocationMessage() }}</p>
       }
     }
   </div>

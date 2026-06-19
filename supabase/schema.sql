@@ -55,6 +55,8 @@ create table if not exists public.attendance_logs (
   user_id uuid not null references auth.users(id) on delete cascade,
   action text not null check (action in ('login', 'logout')),
   method text not null check (method in ('face', 'fingerprint')),
+  latitude double precision,
+  longitude double precision,
   created_at timestamptz not null default now()
 );
 
@@ -72,3 +74,32 @@ create policy "Users insert their own attendance logs"
 
 create index if not exists attendance_logs_user_created_idx
   on public.attendance_logs (user_id, created_at desc);
+
+-- Single reference point (the office/server location) that clock in/out is
+-- measured against. Set once via the "Set office location" action.
+-- Note: unlike the local backend, distance here is only enforced client-side;
+-- there is no Postgres-side check on attendance_logs inserts.
+create table if not exists public.office_location (
+  id smallint primary key default 1,
+  latitude double precision not null,
+  longitude double precision not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.office_location enable row level security;
+
+create policy "Authenticated users read the office location"
+  on public.office_location
+  for select
+  using (auth.role() = 'authenticated');
+
+create policy "Authenticated users set the office location"
+  on public.office_location
+  for insert
+  with check (auth.role() = 'authenticated');
+
+create policy "Authenticated users update the office location"
+  on public.office_location
+  for update
+  using (auth.role() = 'authenticated')
+  with check (auth.role() = 'authenticated');

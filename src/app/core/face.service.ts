@@ -65,20 +65,31 @@ export class FaceService {
   }
 
   async isEnrolled(userId: string): Promise<boolean> {
-    if (this.isLocal) {
-      const { enrolled } = await this.localApi.request<{ enrolled: boolean }>('/face/status', {
-        method: 'GET',
-      });
+    const cacheKey = `payroll_one_face_enrolled_${userId}`;
+    try {
+      let enrolled: boolean;
+      if (this.isLocal) {
+        ({ enrolled } = await this.localApi.request<{ enrolled: boolean }>('/face/status', {
+          method: 'GET',
+        }));
+      } else {
+        const { data, error } = await this.supabase.client
+          .from('face_enrollments')
+          .select('user_id')
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (error) throw error;
+        enrolled = !!data;
+      }
+      localStorage.setItem(cacheKey, String(enrolled));
       return enrolled;
+    } catch (err) {
+      // Offline and can't ask the server — fall back to the last known
+      // answer rather than failing the whole enrollment/dashboard check.
+      const cached = localStorage.getItem(cacheKey);
+      if (cached !== null) return cached === 'true';
+      throw err;
     }
-
-    const { data, error } = await this.supabase.client
-      .from('face_enrollments')
-      .select('user_id')
-      .eq('user_id', userId)
-      .maybeSingle();
-    if (error) throw error;
-    return !!data;
   }
 
   async verifyAgainstEnrollment(userId: string, liveDescriptor: Float32Array): Promise<boolean> {

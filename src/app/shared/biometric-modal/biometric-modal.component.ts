@@ -113,7 +113,14 @@ export class BiometricModalComponent implements OnInit, OnDestroy {
       this.success.emit('fingerprint');
     } catch (err) {
       this.status.set('error');
-      this.errorMessage.set(err instanceof Error ? err.message : 'Fingerprint check failed.');
+      const userId = this.auth.user()?.id;
+      if (userId && !this.webauthnService.isEnrolledOnThisDevice(userId)) {
+        this.errorMessage.set(
+          "This device hasn't registered a fingerprint yet. Go to Enroll and add it on this device.",
+        );
+      } else {
+        this.errorMessage.set(err instanceof Error ? err.message : 'Fingerprint check failed.');
+      }
     }
   }
 

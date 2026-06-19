@@ -1,0 +1,42 @@
+<div class="container container--wide">
+  <div class="stack">
+    <h1>{{ isAdmin() ? 'Attendance logs' : 'Your attendance logs' }}</h1>
+
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+
+    @if (loading()) {
+      <p class="text-muted text-sm">Loading…</p>
+    } @else if (logs().length === 0) {
+      <p class="text-muted text-sm">
+        {{ isAdmin() ? 'No attendance records yet.' : "You don't have any attendance records yet." }}
+      </p>
+    } @else {
+      <div class="log-list">
+        @for (log of logs(); track log.created_at + (log.user_id ?? '')) {
+          <div class="log-row card">
+            <app-user-avatar [photoUrl]="log.photo_url" [fullName]="log.full_name ?? ''" />
+
+            <span class="log-row__name">{{ log.full_name ?? 'Unknown user' }}</span>
+
+            <span class="badge" [class.badge--success]="log.action === 'login'">
+              {{ log.action === 'login' ? 'Clock in' : 'Clock out' }}
+            </span>
+
+            <span class="log-row__method text-muted text-sm">
+              {{ log.method === 'face' ? 'Face recognition' : 'Fingerprint' }}
+            </span>
+
+            <span class="log-row__time text-sm">
+              {{ displayTime(log) | date: 'medium' }}
+              @if (wasSyncedLate(log)) {
+                <span class="text-muted">(synced later)</span>
+              }
+            </span>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</div>

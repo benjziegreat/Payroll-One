@@ -10,7 +10,11 @@ function toPublicUser(row) {
   return {
     id: row.id,
     email: row.email,
-    user_metadata: { full_name: row.full_name },
+    user_metadata: {
+      full_name: row.full_name,
+      role: row.role ?? 'employee',
+      photo_url: row.photo_url ?? null,
+    },
   };
 }
 

@@ -2,6 +2,10 @@
   <div class="stack">
     <h1>Attendance history</h1>
 
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+
     @if (loading()) {
       <p class="text-muted text-sm">Loading…</p>
     } @else if (logs().length === 0) {
@@ -16,7 +20,12 @@
             <span class="log-row__method text-muted text-sm">
               {{ log.method === 'face' ? 'Face recognition' : 'Fingerprint' }}
             </span>
-            <span class="log-row__time text-sm">{{ log.created_at | date: 'medium' }}</span>
+            <span class="log-row__time text-sm">
+              {{ displayTime(log) | date: 'medium' }}
+              @if (wasSyncedLate(log)) {
+                <span class="text-muted">(synced later)</span>
+              }
+            </span>
           </div>
         }
       </div>

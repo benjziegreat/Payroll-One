@@ -5,6 +5,10 @@
       <nav class="topbar__nav">
         <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
         <a routerLink="/history" routerLinkActive="active">History</a>
+        <a routerLink="/admin/logs" routerLinkActive="active">Logs</a>
+        @if (isAdmin()) {
+          <a routerLink="/admin/users" routerLinkActive="active">Users</a>
+        }
         <button class="btn btn-ghost" type="button" (click)="logout()">Sign out</button>
       </nav>
     </header>

@@ -63,12 +63,20 @@ async function ensureLocalServer(port) {
 
   log('Local server not running — starting "npm run serve:https"...');
   const out = fs.openSync(SERVER_LOG_FILE, 'w');
-  const child = spawn(isWindows ? 'npm.cmd' : 'npm', ['run', 'serve:https'], {
-    cwd: PROJECT_ROOT,
-    detached: true,
-    shell: isWindows,
-    stdio: ['ignore', out, out],
-  });
+  // On Windows, "start /B" detaches the process from the console and makes it
+  // ignore Ctrl+C, so it isn't taken down by signals sent to whatever console
+  // launched this script (unlike a plain shell:true spawn of npm.cmd).
+  const child = isWindows
+    ? spawn('cmd.exe', ['/c', 'start', '/B', 'npm', 'run', 'serve:https'], {
+        cwd: PROJECT_ROOT,
+        detached: true,
+        stdio: ['ignore', out, out],
+      })
+    : spawn('npm', ['run', 'serve:https'], {
+        cwd: PROJECT_ROOT,
+        detached: true,
+        stdio: ['ignore', out, out],
+      });
   child.unref();
 
   log('Waiting for local server to be ready (this may take a while during build)...');

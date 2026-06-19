@@ -1,5 +1,6 @@
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const jwt = require('jsonwebtoken');
+const { pool } = require('./db');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const TOKEN_TTL = '12h';
@@ -26,4 +27,13 @@ function requireUser(req, res, next) {
   }
 }
 
-module.exports = { signToken, requireUser };
+async function requireAdmin(req, res, next) {
+  const [rows] = await pool.query('SELECT role FROM users WHERE id = ?', [req.userId]);
+  if (rows[0]?.role !== 'admin') {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
+  next();
+}
+
+module.exports = { signToken, requireUser, requireAdmin };

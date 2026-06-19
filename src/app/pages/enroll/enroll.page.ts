@@ -29,6 +29,7 @@ export class EnrollPage implements OnInit, OnDestroy {
 
   readonly faceEnrolled = signal(false);
   readonly fingerprintEnrolled = signal(false);
+  readonly fingerprintEnrolledOnThisDevice = signal(false);
   readonly webauthnSupported = this.webauthnService.isSupported();
 
   readonly faceCameraOpen = signal(false);
@@ -47,6 +48,7 @@ export class EnrollPage implements OnInit, OnDestroy {
     ]);
     this.faceEnrolled.set(face);
     this.fingerprintEnrolled.set(fingerprint);
+    this.fingerprintEnrolledOnThisDevice.set(this.webauthnService.isEnrolledOnThisDevice(user.id));
   }
 
   async openFaceCamera() {
@@ -99,6 +101,7 @@ export class EnrollPage implements OnInit, OnDestroy {
     try {
       await this.webauthnService.register();
       this.fingerprintEnrolled.set(true);
+      this.fingerprintEnrolledOnThisDevice.set(true);
     } catch (err) {
       this.fingerprintError.set(err instanceof Error ? err.message : 'Could not enroll fingerprint.');
     } finally {

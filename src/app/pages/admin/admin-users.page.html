@@ -1,0 +1,61 @@
+<div class="container container--wide">
+  <div class="stack">
+    <div class="stack" style="gap: 4px">
+      <h1>Users</h1>
+      <p class="text-muted text-sm">
+        Each user's distance is based on their last clock-in/out location. Users beyond
+        {{ geofenceMaxLabel }} can't clock in or out unless allowed below.
+      </p>
+    </div>
+
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+
+    @if (loading()) {
+      <p class="text-muted text-sm">Loading…</p>
+    } @else if (users().length === 0) {
+      <p class="text-muted text-sm">No users found.</p>
+    } @else {
+      <div class="user-list">
+        @for (user of users(); track user.id) {
+          <div class="user-row card">
+            <app-user-avatar [photoUrl]="user.photoUrl" [fullName]="user.fullName" />
+
+            <div class="user-row__info">
+              <p class="user-row__name">
+                {{ user.fullName }}
+                @if (user.role === 'admin') {
+                  <span class="badge">Admin</span>
+                }
+              </p>
+              <p class="text-muted text-sm">{{ user.email }}</p>
+            </div>
+
+            <div class="user-row__status">
+              <span [class]="isOverLimit(user) ? 'error' : 'text-muted'" class="text-sm">
+                {{ distanceLabel(user) }}
+              </span>
+              @if (user.lastSeenAt) {
+                <span class="text-muted text-sm">
+                  Last {{ user.lastAction === 'login' ? 'clocked in' : 'clocked out' }}
+                  {{ user.lastSeenAt | date: 'medium' }}
+                </span>
+              }
+            </div>
+
+            <button
+              class="btn"
+              [class.btn-primary]="user.bypassGeofence"
+              type="button"
+              [disabled]="pendingId() === user.id"
+              (click)="toggleBypass(user)"
+            >
+              {{ user.bypassGeofence ? 'Allowed beyond ' + geofenceMaxLabel : 'Allow beyond ' + geofenceMaxLabel }}
+            </button>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</div>

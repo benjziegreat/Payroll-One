@@ -1,9 +1,11 @@
 import { Injectable, signal } from '@angular/core';
 import type { Session } from '@supabase/supabase-js';
 import { environment } from '../../environments/environment';
-import { LocalApiService } from './local-api.service';
+import { LocalApiService, OfflineError } from './local-api.service';
 import { SupabaseService } from './supabase.service';
 import type { AppUser } from './types';
+
+const CACHED_USER_KEY = 'payroll_one_local_user';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -38,11 +40,35 @@ export class AuthService {
       try {
         const { user } = await this.localApi.request<{ user: AppUser }>('/auth/me');
         this.user.set(user);
-      } catch {
-        this.localApi.setToken(null);
+        this.cacheUser(user);
+      } catch (err) {
+        if (err instanceof OfflineError) {
+          // Can't reach the server to confirm the session, but the token
+          // might still be perfectly valid — restore the last-known user
+          // instead of signing them out just because they're offline.
+          const cached = this.getCachedUser();
+          if (cached) this.user.set(cached);
+        } else {
+          // The server explicitly rejected the token (expired/invalid).
+          this.localApi.setToken(null);
+          this.clearCachedUser();
+        }
       }
     }
     this.ready.set(true);
+  }
+
+  private cacheUser(user: AppUser) {
+    localStorage.setItem(CACHED_USER_KEY, JSON.stringify(user));
+  }
+
+  private getCachedUser(): AppUser | null {
+    const raw = localStorage.getItem(CACHED_USER_KEY);
+    return raw ? (JSON.parse(raw) as AppUser) : null;
+  }
+
+  private clearCachedUser() {
+    localStorage.removeItem(CACHED_USER_KEY);
   }
 
   async signUp(email: string, password: string, fullName: string) {
@@ -53,6 +79,7 @@ export class AuthService {
       );
       this.localApi.setToken(token);
       this.user.set(user);
+      this.cacheUser(user);
       return;
     }
 
@@ -72,6 +99,7 @@ export class AuthService {
       );
       this.localApi.setToken(token);
       this.user.set(user);
+      this.cacheUser(user);
       return;
     }
 
@@ -82,6 +110,7 @@ export class AuthService {
   async signOut() {
     if (this.isLocal) {
       this.localApi.setToken(null);
+      this.clearCachedUser();
       this.user.set(null);
       return;
     }

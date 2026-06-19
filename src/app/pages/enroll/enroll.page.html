@@ -38,8 +38,10 @@
     <div class="card stack">
       <div class="card__title">
         <h2>Fingerprint / device biometric</h2>
-        @if (fingerprintEnrolled()) {
+        @if (fingerprintEnrolledOnThisDevice()) {
           <span class="badge badge--success">Enrolled</span>
+        } @else if (fingerprintEnrolled()) {
+          <span class="badge">Enrolled on another device</span>
         }
       </div>
 
@@ -47,13 +49,22 @@
         <p class="text-muted text-sm">Not supported on this browser or device.</p>
       } @else {
         <p class="text-muted text-sm">
-          Uses your device's built-in fingerprint, Face ID, or Windows Hello.
+          Uses your device's built-in fingerprint, Face ID, or Windows Hello. A fingerprint is
+          tied to the device it's enrolled on — add it again here to clock in/out from this device too.
         </p>
         @if (fingerprintError()) {
           <p class="error">{{ fingerprintError() }}</p>
         }
         <button class="btn" type="button" [disabled]="fingerprintBusy()" (click)="enrollFingerprint()">
-          {{ fingerprintBusy() ? 'Waiting for device…' : fingerprintEnrolled() ? 'Re-enroll fingerprint' : 'Enroll fingerprint' }}
+          {{
+            fingerprintBusy()
+              ? 'Waiting for device…'
+              : fingerprintEnrolledOnThisDevice()
+                ? 'Re-enroll fingerprint'
+                : fingerprintEnrolled()
+                  ? 'Add this device'
+                  : 'Enroll fingerprint'
+          }}
         </button>
       }
     </div>
