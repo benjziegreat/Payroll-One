@@ -45,7 +45,9 @@ router.post('/register-options', async (req, res) => {
     authenticatorSelection: {
       authenticatorAttachment: 'platform',
       userVerification: 'required',
-      residentKey: 'preferred',
+      // Must be discoverable (resident) so the kiosk's usernameless flow can
+      // find "whoever's finger this is" without already knowing who to ask.
+      residentKey: 'required',
     },
     excludeCredentials: existingCredentials.map((c) => ({
       id: c.credential_id,

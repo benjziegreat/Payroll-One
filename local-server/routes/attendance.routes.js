@@ -2,11 +2,9 @@ const express = require('express');
 const crypto = require('crypto');
 const { pool } = require('../db');
 const { requireUser } = require('../auth');
-const { distanceMeters, formatDistance } = require('../geo');
+const { checkGeofence } = require('../attendance-helpers');
 
 const router = express.Router();
-const GEOFENCE_MIN_RADIUS_METERS = Number(process.env.GEOFENCE_MIN_RADIUS_METERS || 0);
-const GEOFENCE_MAX_RADIUS_METERS = Number(process.env.GEOFENCE_MAX_RADIUS_METERS || 10);
 
 router.use(requireUser);
 
@@ -51,30 +49,10 @@ router.post('/', async (req, res) => {
     }
   }
 
-  const [userRows] = await pool.query('SELECT bypass_geofence FROM users WHERE id = ?', [
-    req.userId,
-  ]);
-  const bypassGeofence = !!userRows[0]?.bypass_geofence;
-
-  const [officeRows] = await pool.query(
-    'SELECT latitude, longitude FROM office_location WHERE id = 1',
-  );
-  const office = officeRows[0];
-  if (office && !bypassGeofence) {
-    if (typeof latitude !== 'number' || typeof longitude !== 'number') {
-      res.status(400).json({ error: 'Location is required to clock in or out.' });
-      return;
-    }
-    const distance = distanceMeters(office.latitude, office.longitude, latitude, longitude);
-    if (distance < GEOFENCE_MIN_RADIUS_METERS || distance > GEOFENCE_MAX_RADIUS_METERS) {
-      res.status(403).json({
-        error:
-          `You're ${formatDistance(distance)} from the office — must be between ` +
-          `${formatDistance(GEOFENCE_MIN_RADIUS_METERS)} and ${formatDistance(GEOFENCE_MAX_RADIUS_METERS)} to clock in or out.`,
-        distance: Math.round(distance),
-      });
-      return;
-    }
+  const geofence = await checkGeofence(pool, req.userId, latitude, longitude);
+  if (!geofence.ok) {
+    res.status(geofence.status).json({ error: geofence.error, distance: geofence.distance });
+    return;
   }
 
   await pool.query(

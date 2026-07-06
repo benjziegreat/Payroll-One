@@ -1,0 +1,64 @@
+<div class="container">
+  <div class="stack">
+    <div class="stack text-center" style="gap: 4px">
+      <h1>Clock In / Out</h1>
+      <p class="text-muted text-sm">Scan your face or fingerprint — no sign-in needed.</p>
+    </div>
+
+    @switch (status()) {
+      @case ('idle') {
+        <div class="card stack">
+          <button class="btn btn-primary" type="button" (click)="chooseFace()">Scan face</button>
+          @if (webauthnSupported) {
+            <button class="btn" type="button" (click)="chooseFingerprint()">
+              Use fingerprint / device biometric
+            </button>
+          }
+        </div>
+      }
+
+      @case ('camera') {
+        <div class="card stack">
+          <div class="face-frame">
+            <video #video playsinline muted></video>
+          </div>
+          @if (errorMessage()) {
+            <p class="error">{{ errorMessage() }}</p>
+          }
+          <button class="btn btn-primary" type="button" (click)="scanFace()">Scan face</button>
+          <button class="btn btn-ghost" type="button" (click)="reset()">Cancel</button>
+        </div>
+      }
+
+      @case ('scanning') {
+        <div class="card stack text-center">
+          <p class="text-muted text-sm">Identifying…</p>
+        </div>
+      }
+
+      @case ('fingerprint') {
+        <div class="card stack text-center">
+          <p class="text-muted text-sm">Follow your device's prompt to scan your fingerprint.</p>
+        </div>
+      }
+
+      @case ('result') {
+        <div class="card stack text-center">
+          <app-user-avatar [photoUrl]="result()!.photoUrl" [fullName]="result()!.fullName" />
+          <h2>{{ result()!.fullName }}</h2>
+          <span class="badge badge--success">
+            {{ result()!.action === 'login' ? 'Clocked in' : 'Clocked out' }}
+          </span>
+          <button class="btn btn-primary" type="button" (click)="reset()">Done</button>
+        </div>
+      }
+
+      @case ('error') {
+        <div class="card stack text-center">
+          <p class="error">{{ errorMessage() }}</p>
+          <button class="btn" type="button" (click)="reset()">Try again</button>
+        </div>
+      }
+    }
+  </div>
+</div>

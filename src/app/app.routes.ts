@@ -35,5 +35,11 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./pages/admin/admin-logs.page').then((m) => m.AdminLogsPage),
   },
+  {
+    // Deliberately no auth guard — this is the shared-device flow where
+    // whoever is in front of the camera/sensor identifies themselves.
+    path: 'kiosk',
+    loadComponent: () => import('./pages/kiosk/kiosk.page').then((m) => m.KioskPage),
+  },
   { path: '**', redirectTo: 'dashboard' },
 ];

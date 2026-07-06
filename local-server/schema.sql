@@ -38,6 +38,14 @@ CREATE TABLE IF NOT EXISTS webauthn_challenges (
   CONSTRAINT fk_webauthn_chal_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Challenges for the kiosk (no-login, "who is this") fingerprint flow, where
+-- there's no user_id yet to key off of — the user is only known once the
+-- assertion comes back and we look up its credential_id.
+CREATE TABLE IF NOT EXISTS webauthn_kiosk_challenges (
+  challenge VARCHAR(255) PRIMARY KEY,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS attendance_logs (
   id CHAR(36) PRIMARY KEY,
   user_id CHAR(36) NOT NULL,

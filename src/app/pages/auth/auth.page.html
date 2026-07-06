@@ -78,5 +78,9 @@
         {{ loading() ? 'Please wait…' : mode() === 'signin' ? 'Sign in' : 'Create account' }}
       </button>
     </form>
+
+    <a routerLink="/kiosk" class="text-muted text-sm text-center">
+      Using a shared device? Clock in/out without signing in →
+    </a>
   </div>
 </div>

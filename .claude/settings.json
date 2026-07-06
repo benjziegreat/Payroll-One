@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Bash(curl -s -o /tmp/router_login.html -D - \"http://192.168.254.254/\" --max-time 10)"
+      "Bash(curl -s -o /tmp/router_login.html -D - \"http://192.168.254.254/\" --max-time 10)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(ls local-server/.env*)",
+      "Bash(cat local-server/.env.example)",
+      "Bash(node local-server/index.js)",
+      "Bash(curl -sk -o /dev/null -w \"%{http_code}\\\\n\" https://localhost:8443/)",
+      "Bash(curl -sk https://localhost:8443/api/health)",
+      "Bash(curl -sk -o /dev/null -w \"%{http_code}\\\\n\" https://localhost:8443/api/local/auth/)",
+      "Bash(curl -sk -X POST -H \"Content-Type: application/json\" -d '{}' https://localhost:8443/api/local/auth/login)",
+      "Bash(curl -sk -X POST -H \"Content-Type: application/json\" -d '{\"email\":\"nobody@example.com\",\"password\":\"wrong\"}' https://localhost:8443/api/local/auth/signin)"
     ]
   }
 }

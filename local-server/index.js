@@ -11,6 +11,7 @@ const webauthnRoutes = require('./routes/webauthn.routes');
 const settingsRoutes = require('./routes/settings.routes');
 const adminRoutes = require('./routes/admin.routes');
 const accountRoutes = require('./routes/account.routes');
+const kioskRoutes = require('./routes/kiosk.routes');
 
 const app = express();
 app.use(express.json());
@@ -22,6 +23,7 @@ app.use('/api/local/webauthn', webauthnRoutes);
 app.use('/api/local/settings', settingsRoutes);
 app.use('/api/local/admin', adminRoutes);
 app.use('/api/local/account', accountRoutes);
+app.use('/api/local/kiosk', kioskRoutes);
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
