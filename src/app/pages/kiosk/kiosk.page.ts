@@ -21,6 +21,10 @@ export class KioskPage implements OnDestroy {
 
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
   private stream: MediaStream | null = null;
+  private autoScanInterval: ReturnType<typeof setInterval> | null = null;
+  private consecutiveDetections = 0;
+  private static readonly AUTO_SCAN_POLL_MS = 400;
+  private static readonly AUTO_SCAN_DETECTIONS_REQUIRED = 2;
 
   readonly webauthnSupported = this.webauthnService.isSupported();
   readonly status = signal<Status>('idle');
@@ -35,6 +39,7 @@ export class KioskPage implements OnDestroy {
       if (!video) return;
       try {
         this.stream = await this.faceService.startCamera(video);
+        this.startAutoScan(video);
       } catch {
         this.status.set('error');
         this.errorMessage.set('Camera access was denied or is unavailable.');
@@ -45,6 +50,7 @@ export class KioskPage implements OnDestroy {
   async scanFace() {
     const video = this.video()?.nativeElement;
     if (!video) return;
+    this.stopAutoScan();
 
     this.status.set('scanning');
     this.errorMessage.set('');
@@ -53,6 +59,7 @@ export class KioskPage implements OnDestroy {
       if (!descriptor) {
         this.status.set('camera');
         this.errorMessage.set('No face detected. Center your face in the frame and try again.');
+        this.startAutoScan(video);
         return;
       }
 
@@ -68,6 +75,40 @@ export class KioskPage implements OnDestroy {
     } catch (err) {
       this.status.set('camera');
       this.errorMessage.set(err instanceof Error ? err.message : 'Face not recognized.');
+      this.startAutoScan(video);
+    }
+  }
+
+  private startAutoScan(video: HTMLVideoElement) {
+    this.stopAutoScan();
+    this.consecutiveDetections = 0;
+    let checkInFlight = false;
+    this.autoScanInterval = setInterval(async () => {
+      if (this.status() !== 'camera' || checkInFlight) return;
+      checkInFlight = true;
+      try {
+        const detected = await this.faceService.detectFacePresence(video);
+        if (!detected) {
+          this.consecutiveDetections = 0;
+          return;
+        }
+        this.consecutiveDetections++;
+        if (this.consecutiveDetections >= KioskPage.AUTO_SCAN_DETECTIONS_REQUIRED) {
+          this.stopAutoScan();
+          this.scanFace();
+        }
+      } catch {
+        // Transient detection failure — keep polling.
+      } finally {
+        checkInFlight = false;
+      }
+    }, KioskPage.AUTO_SCAN_POLL_MS);
+  }
+
+  private stopAutoScan() {
+    if (this.autoScanInterval !== null) {
+      clearInterval(this.autoScanInterval);
+      this.autoScanInterval = null;
     }
   }
 
@@ -104,6 +145,7 @@ export class KioskPage implements OnDestroy {
   }
 
   private stopCamera() {
+    this.stopAutoScan();
     FaceService.stopCamera(this.stream);
     this.stream = null;
   }

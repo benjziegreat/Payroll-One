@@ -22,10 +22,11 @@
           <div class="face-frame">
             <video #video playsinline muted></video>
           </div>
+          <p class="text-muted text-sm text-center">Hold still — scanning starts automatically.</p>
           @if (errorMessage()) {
             <p class="error">{{ errorMessage() }}</p>
           }
-          <button class="btn btn-primary" type="button" (click)="scanFace()">Scan face</button>
+          <button class="btn btn-primary" type="button" (click)="scanFace()">Scan face now</button>
           <button class="btn btn-ghost" type="button" (click)="reset()">Cancel</button>
         </div>
       }

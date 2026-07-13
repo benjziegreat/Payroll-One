@@ -63,6 +63,9 @@
           "defaultConfiguration": "production"
         },
         "serve": {
+          "options": {
+              "allowedHosts": ["mobile-dtr.intekn-app.com"]
+          },
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {

@@ -10,6 +10,7 @@ const MATCH_THRESHOLD = 0.55;
 export class FaceService {
   private faceapi: typeof import('face-api.js') | null = null;
   private modelsLoaded = false;
+  private modelsLoadingPromise: Promise<void> | null = null;
   private readonly isLocal = environment.backend === 'local';
 
   constructor(
@@ -19,13 +20,18 @@ export class FaceService {
 
   private async ensureModelsLoaded() {
     if (this.modelsLoaded) return;
-    this.faceapi = await import('face-api.js');
-    await Promise.all([
-      this.faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-      this.faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-      this.faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-    ]);
-    this.modelsLoaded = true;
+    if (!this.modelsLoadingPromise) {
+      this.modelsLoadingPromise = (async () => {
+        this.faceapi = await import('face-api.js');
+        await Promise.all([
+          this.faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          this.faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+          this.faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+        ]);
+        this.modelsLoaded = true;
+      })();
+    }
+    await this.modelsLoadingPromise;
   }
 
   async startCamera(video: HTMLVideoElement): Promise<MediaStream> {
@@ -40,6 +46,13 @@ export class FaceService {
 
   static stopCamera(stream: MediaStream | null) {
     stream?.getTracks().forEach((track) => track.stop());
+  }
+
+  async detectFacePresence(video: HTMLVideoElement): Promise<boolean> {
+    await this.ensureModelsLoaded();
+    const faceapi = this.faceapi!;
+    const result = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions());
+    return !!result;
   }
 
   async captureDescriptor(video: HTMLVideoElement): Promise<Float32Array | null> {
