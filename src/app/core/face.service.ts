@@ -55,6 +55,33 @@ export class FaceService {
     return !!result;
   }
 
+  // Resolves once a face is detected for N consecutive polls; rejects with AbortError if `signal` fires first.
+  async waitForStableFace(
+    video: HTMLVideoElement,
+    options: { pollMs?: number; requiredDetections?: number; signal: AbortSignal },
+  ): Promise<void> {
+    const pollMs = options.pollMs ?? 400;
+    const requiredDetections = options.requiredDetections ?? 2;
+    const { signal } = options;
+
+    let consecutive = 0;
+    while (!signal.aborted) {
+      let detected = false;
+      try {
+        detected = await this.detectFacePresence(video);
+      } catch {
+        detected = false;
+      }
+      if (signal.aborted) break;
+
+      consecutive = detected ? consecutive + 1 : 0;
+      if (consecutive >= requiredDetections) return;
+
+      await new Promise<void>((resolve) => setTimeout(resolve, pollMs));
+    }
+    throw new DOMException('Aborted', 'AbortError');
+  }
+
   async captureDescriptor(video: HTMLVideoElement): Promise<Float32Array | null> {
     await this.ensureModelsLoaded();
     const faceapi = this.faceapi!;

@@ -107,6 +107,19 @@ export class AuthService {
     if (error) throw error;
   }
 
+  async signInWithFace(descriptor: Float32Array) {
+    if (!this.isLocal) {
+      throw new Error('Face sign-in is only available on the local backend.');
+    }
+    const { token, user } = await this.localApi.request<{ token: string; user: AppUser }>(
+      '/auth/face-signin',
+      { body: { descriptor: Array.from(descriptor) }, auth: false },
+    );
+    this.localApi.setToken(token);
+    this.user.set(user);
+    this.cacheUser(user);
+  }
+
   async signOut() {
     if (this.isLocal) {
       this.localApi.setToken(null);

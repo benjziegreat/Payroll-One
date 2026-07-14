@@ -4,7 +4,17 @@ const bcrypt = require('bcryptjs');
 const { pool } = require('../db');
 const { signToken, requireUser } = require('../auth');
 
+const FACE_MATCH_THRESHOLD = 0.55;
+
 const router = express.Router();
+
+function euclideanDistance(a, b) {
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) {
+    sum += (a[i] - b[i]) ** 2;
+  }
+  return Math.sqrt(sum);
+}
 
 function toPublicUser(row) {
   return {
@@ -53,6 +63,40 @@ router.post('/signin', async (req, res) => {
   const user = rows[0];
   if (!user || !(await bcrypt.compare(password, user.password_hash))) {
     res.status(401).json({ error: 'Invalid email or password' });
+    return;
+  }
+
+  res.status(200).json({ token: signToken(user), user: toPublicUser(user) });
+});
+
+router.post('/face-signin', async (req, res) => {
+  const { descriptor } = req.body || {};
+  if (!Array.isArray(descriptor) || descriptor.length === 0) {
+    res.status(400).json({ error: 'descriptor array is required' });
+    return;
+  }
+
+  const [rows] = await pool.query('SELECT user_id, descriptor FROM face_enrollments');
+
+  let bestUserId = null;
+  let bestDistance = Infinity;
+  for (const row of rows) {
+    const distance = euclideanDistance(row.descriptor, descriptor);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestUserId = row.user_id;
+    }
+  }
+
+  if (!bestUserId || bestDistance > FACE_MATCH_THRESHOLD) {
+    res.status(401).json({ error: 'Face not recognized.' });
+    return;
+  }
+
+  const [userRows] = await pool.query('SELECT * FROM users WHERE id = ?', [bestUserId]);
+  const user = userRows[0];
+  if (!user) {
+    res.status(404).json({ error: 'User not found' });
     return;
   }
 

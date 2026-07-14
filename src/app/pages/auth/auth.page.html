@@ -24,60 +24,81 @@
       </button>
     </div>
 
-    <form class="stack" (ngSubmit)="submit()">
-      @if (mode() === 'signup') {
+    @if (faceCameraOpen()) {
+      <div class="stack">
+        <div class="face-frame">
+          <video #faceVideo playsinline muted></video>
+        </div>
+        <p class="text-muted text-sm text-center">
+          {{ faceScanning() ? 'Identifying…' : 'Hold still — scanning starts automatically.' }}
+        </p>
+        @if (faceError()) {
+          <p class="error">{{ faceError() }}</p>
+        }
+        <button class="btn btn-ghost" type="button" (click)="closeFaceSignIn()">
+          Use email and password instead
+        </button>
+      </div>
+    } @else {
+      <form class="stack" (ngSubmit)="submit()">
+        @if (mode() === 'signup') {
+          <div class="field">
+            <label for="fullName">Full name</label>
+            <input
+              id="fullName"
+              class="input"
+              type="text"
+              name="fullName"
+              [(ngModel)]="fullName"
+              required
+              autocomplete="name"
+            />
+          </div>
+        }
+
         <div class="field">
-          <label for="fullName">Full name</label>
+          <label for="email">Email</label>
           <input
-            id="fullName"
+            id="email"
             class="input"
-            type="text"
-            name="fullName"
-            [(ngModel)]="fullName"
+            type="email"
+            name="email"
+            [(ngModel)]="email"
             required
-            autocomplete="name"
+            autocomplete="email"
           />
         </div>
+
+        <div class="field">
+          <label for="password">Password</label>
+          <input
+            id="password"
+            class="input"
+            type="password"
+            name="password"
+            [(ngModel)]="password"
+            required
+            minlength="6"
+            autocomplete="current-password"
+          />
+        </div>
+
+        @if (error()) {
+          <p class="error">{{ error() }}</p>
+        }
+        @if (info()) {
+          <p class="success">{{ info() }}</p>
+        }
+
+        <button class="btn btn-primary" type="submit" [disabled]="loading()">
+          {{ loading() ? 'Please wait…' : mode() === 'signin' ? 'Sign in' : 'Create account' }}
+        </button>
+      </form>
+
+      @if (mode() === 'signin' && faceSignInSupported) {
+        <button class="btn" type="button" (click)="openFaceSignIn()">Sign in with face</button>
       }
-
-      <div class="field">
-        <label for="email">Email</label>
-        <input
-          id="email"
-          class="input"
-          type="email"
-          name="email"
-          [(ngModel)]="email"
-          required
-          autocomplete="email"
-        />
-      </div>
-
-      <div class="field">
-        <label for="password">Password</label>
-        <input
-          id="password"
-          class="input"
-          type="password"
-          name="password"
-          [(ngModel)]="password"
-          required
-          minlength="6"
-          autocomplete="current-password"
-        />
-      </div>
-
-      @if (error()) {
-        <p class="error">{{ error() }}</p>
-      }
-      @if (info()) {
-        <p class="success">{{ info() }}</p>
-      }
-
-      <button class="btn btn-primary" type="submit" [disabled]="loading()">
-        {{ loading() ? 'Please wait…' : mode() === 'signin' ? 'Sign in' : 'Create account' }}
-      </button>
-    </form>
+    }
 
     <a routerLink="/kiosk" class="text-muted text-sm text-center">
       Using a shared device? Clock in/out without signing in →

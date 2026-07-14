@@ -21,10 +21,7 @@ export class KioskPage implements OnDestroy {
 
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
   private stream: MediaStream | null = null;
-  private autoScanInterval: ReturnType<typeof setInterval> | null = null;
-  private consecutiveDetections = 0;
-  private static readonly AUTO_SCAN_POLL_MS = 400;
-  private static readonly AUTO_SCAN_DETECTIONS_REQUIRED = 2;
+  private autoScanAbort: AbortController | null = null;
 
   readonly webauthnSupported = this.webauthnService.isSupported();
   readonly status = signal<Status>('idle');
@@ -81,35 +78,22 @@ export class KioskPage implements OnDestroy {
 
   private startAutoScan(video: HTMLVideoElement) {
     this.stopAutoScan();
-    this.consecutiveDetections = 0;
-    let checkInFlight = false;
-    this.autoScanInterval = setInterval(async () => {
-      if (this.status() !== 'camera' || checkInFlight) return;
-      checkInFlight = true;
-      try {
-        const detected = await this.faceService.detectFacePresence(video);
-        if (!detected) {
-          this.consecutiveDetections = 0;
-          return;
-        }
-        this.consecutiveDetections++;
-        if (this.consecutiveDetections >= KioskPage.AUTO_SCAN_DETECTIONS_REQUIRED) {
-          this.stopAutoScan();
-          this.scanFace();
-        }
-      } catch {
-        // Transient detection failure — keep polling.
-      } finally {
-        checkInFlight = false;
-      }
-    }, KioskPage.AUTO_SCAN_POLL_MS);
+    const controller = new AbortController();
+    this.autoScanAbort = controller;
+    this.faceService
+      .waitForStableFace(video, { signal: controller.signal })
+      .then(() => {
+        if (controller.signal.aborted) return;
+        this.scanFace();
+      })
+      .catch(() => {
+        // Aborted during teardown or manual scan — nothing to do.
+      });
   }
 
   private stopAutoScan() {
-    if (this.autoScanInterval !== null) {
-      clearInterval(this.autoScanInterval);
-      this.autoScanInterval = null;
-    }
+    this.autoScanAbort?.abort();
+    this.autoScanAbort = null;
   }
 
   async chooseFingerprint() {
