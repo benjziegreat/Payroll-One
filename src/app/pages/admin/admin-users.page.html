@@ -44,6 +44,17 @@
               }
             </div>
 
+            <select
+              class="input user-row__office-select"
+              [ngModel]="user.officeLocationId"
+              [disabled]="pendingId() === user.id"
+              (ngModelChange)="assignOfficeLocation(user, $event)"
+            >
+              @for (location of officeLocations(); track location.id) {
+                <option [value]="location.id">{{ location.name }}</option>
+              }
+            </select>
+
             <button
               class="btn"
               [class.btn-primary]="user.bypassGeofence"

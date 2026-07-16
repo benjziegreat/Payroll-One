@@ -4,14 +4,18 @@ const GEOFENCE_MIN_RADIUS_METERS = Number(process.env.GEOFENCE_MIN_RADIUS_METERS
 const GEOFENCE_MAX_RADIUS_METERS = Number(process.env.GEOFENCE_MAX_RADIUS_METERS || 10);
 
 async function checkGeofence(pool, userId, latitude, longitude) {
-  const [userRows] = await pool.query('SELECT bypass_geofence FROM users WHERE id = ?', [userId]);
+  const [userRows] = await pool.query(
+    'SELECT bypass_geofence, office_location_id FROM users WHERE id = ?',
+    [userId],
+  );
   const bypassGeofence = !!userRows[0]?.bypass_geofence;
 
-  const [officeRows] = await pool.query(
-    'SELECT latitude, longitude FROM office_location WHERE id = 1',
-  );
+  const [officeRows] = await pool.query('SELECT latitude, longitude FROM office_locations WHERE id = ?', [
+    userRows[0]?.office_location_id,
+  ]);
   const office = officeRows[0];
-  if (!office || bypassGeofence) return { ok: true };
+  const officeIsSet = office && office.latitude !== null && office.longitude !== null;
+  if (!officeIsSet || bypassGeofence) return { ok: true };
 
   if (typeof latitude !== 'number' || typeof longitude !== 'number') {
     return { ok: false, status: 400, error: 'Location is required to clock in or out.' };

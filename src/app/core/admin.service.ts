@@ -11,9 +11,19 @@ export interface AdminUserRow {
   role: UserRole;
   bypassGeofence: boolean;
   photoUrl: string | null;
+  officeLocationId: number;
+  officeLocationName: string | null;
   lastAction: AttendanceAction | null;
   lastSeenAt: string | null;
   distanceMeters: number | null;
+}
+
+export interface AdminOfficeLocationRow {
+  id: number;
+  name: string;
+  latitude: number | null;
+  longitude: number | null;
+  employeeCount: number;
 }
 
 export interface AdminAttendanceLogRow {
@@ -46,6 +56,50 @@ export class AdminService {
       method: 'PATCH',
       body: { bypassGeofence },
     });
+  }
+
+  async setUserOfficeLocation(userId: string, officeLocationId: number): Promise<void> {
+    this.assertLocal();
+    await this.localApi.request(`/admin/users/${userId}/office-location`, {
+      method: 'PATCH',
+      body: { officeLocationId },
+    });
+  }
+
+  async getOfficeLocations(): Promise<AdminOfficeLocationRow[]> {
+    this.assertLocal();
+    const { locations } = await this.localApi.request<{ locations: AdminOfficeLocationRow[] }>(
+      '/admin/office-locations',
+      { method: 'GET' },
+    );
+    return locations;
+  }
+
+  async createOfficeLocation(
+    name: string,
+    coords?: { latitude: number; longitude: number },
+  ): Promise<number> {
+    this.assertLocal();
+    const { id } = await this.localApi.request<{ id: number }>('/admin/office-locations', {
+      body: { name, ...coords },
+    });
+    return id;
+  }
+
+  async updateOfficeLocation(
+    id: number,
+    changes: { name?: string; latitude?: number; longitude?: number },
+  ): Promise<void> {
+    this.assertLocal();
+    await this.localApi.request(`/admin/office-locations/${id}`, {
+      method: 'PATCH',
+      body: changes,
+    });
+  }
+
+  async deleteOfficeLocation(id: number): Promise<void> {
+    this.assertLocal();
+    await this.localApi.request(`/admin/office-locations/${id}`, { method: 'DELETE' });
   }
 
   async getAttendanceLogs(limit = 200): Promise<AdminAttendanceLogRow[]> {

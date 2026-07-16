@@ -6,24 +6,22 @@ const router = express.Router();
 
 router.use(requireUser);
 
+// Returns the office location the caller is assigned to (set by an admin —
+// see /admin/office-locations and /admin/users/:id/office-location).
 router.get('/office-location', async (req, res) => {
-  const [rows] = await pool.query('SELECT latitude, longitude FROM office_location WHERE id = 1');
-  res.status(200).json({ location: rows[0] ?? null });
-});
-
-router.post('/office-location', async (req, res) => {
-  const { latitude, longitude } = req.body || {};
-  if (typeof latitude !== 'number' || typeof longitude !== 'number') {
-    res.status(400).json({ error: 'Invalid latitude or longitude' });
-    return;
-  }
-
-  await pool.query(
-    'INSERT INTO office_location (id, latitude, longitude) VALUES (1, ?, ?) ' +
-      'ON DUPLICATE KEY UPDATE latitude = ?, longitude = ?',
-    [latitude, longitude, latitude, longitude],
+  const [rows] = await pool.query(
+    `SELECT ol.id, ol.name, ol.latitude, ol.longitude
+     FROM users u
+     JOIN office_locations ol ON ol.id = u.office_location_id
+     WHERE u.id = ?`,
+    [req.userId],
   );
-  res.status(200).json({ ok: true });
+  const row = rows[0];
+  const location =
+    row && row.latitude !== null && row.longitude !== null
+      ? { id: row.id, name: row.name, latitude: row.latitude, longitude: row.longitude }
+      : null;
+  res.status(200).json({ location });
 });
 
 module.exports = router;

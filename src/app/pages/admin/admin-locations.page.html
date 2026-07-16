@@ -1,0 +1,157 @@
+<div class="container container--wide">
+  <div class="stack">
+    <div class="stack" style="gap: 4px">
+      <h1>Office locations</h1>
+      <p class="text-muted text-sm">
+        Each employee clocks in/out against the office location they're assigned to (see the
+        Users page). Coordinates left unset mean that location has no geofence yet.
+      </p>
+    </div>
+
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+
+    @if (!creating()) {
+      <button class="btn" type="button" (click)="startCreate()">Add office location</button>
+    } @else {
+      <div class="card stack">
+        <div class="field">
+          <label for="newName">Name</label>
+          <input
+            id="newName"
+            class="input"
+            type="text"
+            [ngModel]="createForm().name"
+            (ngModelChange)="createForm.set({ ...createForm(), name: $event })"
+          />
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="newLat">Latitude</label>
+            <input
+              id="newLat"
+              class="input"
+              type="text"
+              inputmode="decimal"
+              [ngModel]="createForm().latitude"
+              (ngModelChange)="createForm.set({ ...createForm(), latitude: $event })"
+            />
+          </div>
+          <div class="field">
+            <label for="newLng">Longitude</label>
+            <input
+              id="newLng"
+              class="input"
+              type="text"
+              inputmode="decimal"
+              [ngModel]="createForm().longitude"
+              (ngModelChange)="createForm.set({ ...createForm(), longitude: $event })"
+            />
+          </div>
+        </div>
+        <button class="btn btn-ghost" type="button" (click)="useCurrentLocationFor('create')">
+          Use my current location
+        </button>
+        <div class="row">
+          <button
+            class="btn btn-primary"
+            type="button"
+            [disabled]="pendingId() === 'new'"
+            (click)="submitCreate()"
+          >
+            {{ pendingId() === 'new' ? 'Saving…' : 'Save location' }}
+          </button>
+          <button class="btn btn-ghost" type="button" (click)="cancelCreate()">Cancel</button>
+        </div>
+      </div>
+    }
+
+    @if (loading()) {
+      <p class="text-muted text-sm">Loading…</p>
+    } @else if (locations().length === 0) {
+      <p class="text-muted text-sm">No office locations yet.</p>
+    } @else {
+      <div class="location-list">
+        @for (location of locations(); track location.id) {
+          <div class="card stack">
+            @if (editingId() !== location.id) {
+              <div class="location-row">
+                <div class="location-row__info">
+                  <p class="location-row__name">{{ location.name }}</p>
+                  <p class="text-muted text-sm">{{ coordsLabel(location) }}</p>
+                  <p class="text-muted text-sm">
+                    {{ location.employeeCount }}
+                    {{ location.employeeCount === 1 ? 'employee' : 'employees' }} assigned
+                  </p>
+                </div>
+                <div class="row location-row__actions">
+                  <button class="btn" type="button" (click)="startEdit(location)">Edit</button>
+                  @if (location.id !== 1) {
+                    <button
+                      class="btn btn-ghost"
+                      type="button"
+                      [disabled]="pendingId() === location.id"
+                      (click)="remove(location)"
+                    >
+                      Delete
+                    </button>
+                  }
+                </div>
+              </div>
+            } @else {
+              <div class="field">
+                <label [for]="'name-' + location.id">Name</label>
+                <input
+                  [id]="'name-' + location.id"
+                  class="input"
+                  type="text"
+                  [ngModel]="editForm().name"
+                  (ngModelChange)="editForm.set({ ...editForm(), name: $event })"
+                />
+              </div>
+              <div class="row">
+                <div class="field">
+                  <label [for]="'lat-' + location.id">Latitude</label>
+                  <input
+                    [id]="'lat-' + location.id"
+                    class="input"
+                    type="text"
+                    inputmode="decimal"
+                    [ngModel]="editForm().latitude"
+                    (ngModelChange)="editForm.set({ ...editForm(), latitude: $event })"
+                  />
+                </div>
+                <div class="field">
+                  <label [for]="'lng-' + location.id">Longitude</label>
+                  <input
+                    [id]="'lng-' + location.id"
+                    class="input"
+                    type="text"
+                    inputmode="decimal"
+                    [ngModel]="editForm().longitude"
+                    (ngModelChange)="editForm.set({ ...editForm(), longitude: $event })"
+                  />
+                </div>
+              </div>
+              <button class="btn btn-ghost" type="button" (click)="useCurrentLocationFor('edit')">
+                Use my current location
+              </button>
+              <div class="row">
+                <button
+                  class="btn btn-primary"
+                  type="button"
+                  [disabled]="pendingId() === location.id"
+                  (click)="submitEdit(location.id)"
+                >
+                  {{ pendingId() === location.id ? 'Saving…' : 'Save changes' }}
+                </button>
+                <button class="btn btn-ghost" type="button" (click)="cancelEdit()">Cancel</button>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+  </div>
+</div>

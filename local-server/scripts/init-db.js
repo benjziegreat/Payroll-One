@@ -30,7 +30,8 @@ async function main() {
 
   const [userCols] = await connection.query(
     "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS " +
-      "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME IN ('role', 'bypass_geofence', 'photo_url')",
+      "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME IN " +
+      "('role', 'bypass_geofence', 'photo_url', 'office_location_id')",
     [process.env.DB_NAME],
   );
   const userColNames = userCols.map((row) => row.COLUMN_NAME);
@@ -49,6 +50,37 @@ async function main() {
   if (!userColNames.includes('photo_url')) {
     await connection.query('ALTER TABLE users ADD COLUMN photo_url VARCHAR(255) NULL');
     console.log('Added photo_url column to users.');
+  }
+
+  // Pre-multi-location installs had a single-row `office_location` table.
+  // schema.sql above already created the new `office_locations` table (with
+  // the id-1 "Main Office" seed row) if it didn't exist yet — here we just
+  // carry over the old single coordinate into that seed row and drop the
+  // legacy table.
+  const [oldOfficeLocationTable] = await connection.query(
+    "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'office_location'",
+    [process.env.DB_NAME],
+  );
+  if (oldOfficeLocationTable.length > 0) {
+    const [oldRows] = await connection.query(
+      'SELECT latitude, longitude FROM office_location WHERE id = 1',
+    );
+    if (oldRows.length > 0) {
+      await connection.query('UPDATE office_locations SET latitude = ?, longitude = ? WHERE id = 1', [
+        oldRows[0].latitude,
+        oldRows[0].longitude,
+      ]);
+    }
+    await connection.query('DROP TABLE office_location');
+    console.log('Migrated office_location into office_locations and dropped the old table.');
+  }
+
+  if (!userColNames.includes('office_location_id')) {
+    await connection.query(
+      'ALTER TABLE users ADD COLUMN office_location_id INT NOT NULL DEFAULT 1, ' +
+        'ADD CONSTRAINT fk_users_office_location FOREIGN KEY (office_location_id) REFERENCES office_locations(id)',
+    );
+    console.log('Added office_location_id column to users.');
   }
 
   const [attendanceCols] = await connection.query(

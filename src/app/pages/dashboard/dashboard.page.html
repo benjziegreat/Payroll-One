@@ -75,7 +75,7 @@
         @if (officeLocation()) {
           @if (distanceLabel() !== null) {
             <p [class]="withinRange() ? 'success' : 'error'">
-              {{ distanceLabel() }} from office
+              {{ distanceLabel() }} from {{ officeLocation()!.name }}
               @switch (rangeStatus()) {
                 @case ('too-close') {
                   — too close, must be {{ geofenceMinLabel }}–{{ geofenceMaxLabel }} away to clock in/out
@@ -109,13 +109,6 @@
         <button class="btn btn-ghost" type="button" (click)="manageEnrollment()">
           Manage enrolled biometrics
         </button>
-      }
-
-      <button class="btn btn-ghost" type="button" (click)="setOfficeLocationHere()" [disabled]="settingOfficeLocation()">
-        {{ officeLocation() ? 'Update office location to here' : 'Set this location as office' }}
-      </button>
-      @if (officeLocationMessage()) {
-        <p class="text-muted text-sm">{{ officeLocationMessage() }}</p>
       }
     }
   </div>

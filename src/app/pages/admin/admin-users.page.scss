@@ -36,6 +36,12 @@
   flex-shrink: 0;
 }
 
+.user-row__office-select {
+  width: auto;
+  max-width: 160px;
+  flex-shrink: 0;
+}
+
 @media (max-width: 640px) {
   .user-row {
     flex-wrap: wrap;

@@ -1,0 +1,44 @@
+.row {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.row .btn {
+  width: auto;
+}
+
+.row .field {
+  flex: 1;
+}
+
+.location-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.location-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.location-row__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.location-row__name {
+  font-weight: 600;
+}
+
+.location-row__actions .btn {
+  width: auto;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .location-row {
+    flex-wrap: wrap;
+  }
+}

@@ -16,8 +16,8 @@ import {
   type BiometricMethod,
 } from '../../core/attendance.service';
 import { FaceService } from '../../core/face.service';
-import { GeoService, type Coordinates } from '../../core/geo.service';
-import { OfficeLocationService } from '../../core/office-location.service';
+import { GeoService } from '../../core/geo.service';
+import { OfficeLocationService, type AssignedOfficeLocation } from '../../core/office-location.service';
 import { OfflineQueueService } from '../../core/offline-queue.service';
 import { ProfilePhotoService } from '../../core/profile-photo.service';
 import { WebauthnService } from '../../core/webauthn.service';
@@ -76,11 +76,9 @@ export class DashboardPage implements OnDestroy {
   readonly pendingSyncCount = this.offlineQueue.pendingCount;
   readonly syncing = this.offlineQueue.syncing;
 
-  readonly officeLocation = signal<Coordinates | null>(null);
+  readonly officeLocation = signal<AssignedOfficeLocation | null>(null);
   readonly position = this.geoService.position;
   readonly geoError = this.geoService.error;
-  readonly settingOfficeLocation = signal(false);
-  readonly officeLocationMessage = signal<string | null>(null);
 
   readonly geofenceMinLabel = GeoService.formatDistance(GEOFENCE_MIN_RADIUS_METERS);
   readonly geofenceMaxLabel = GeoService.formatDistance(GEOFENCE_MAX_RADIUS_METERS);
@@ -199,23 +197,6 @@ export class DashboardPage implements OnDestroy {
 
   onCancel() {
     this.modalOpen.set(false);
-  }
-
-  async setOfficeLocationHere() {
-    this.settingOfficeLocation.set(true);
-    this.officeLocationMessage.set(null);
-    try {
-      const coords = await this.geoService.getCurrentPosition();
-      await this.officeLocationService.set(coords);
-      this.officeLocation.set(coords);
-      this.officeLocationMessage.set('Office location updated to your current position.');
-    } catch (err) {
-      this.officeLocationMessage.set(
-        err instanceof Error ? err.message : 'Could not read your current location.',
-      );
-    } finally {
-      this.settingOfficeLocation.set(false);
-    }
   }
 
   manageEnrollment() {
