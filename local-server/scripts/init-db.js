@@ -77,10 +77,20 @@ async function main() {
 
   if (!userColNames.includes('office_location_id')) {
     await connection.query(
-      'ALTER TABLE users ADD COLUMN office_location_id INT NOT NULL DEFAULT 1, ' +
+      'ALTER TABLE users ADD COLUMN office_location_id INT NULL DEFAULT 1, ' +
         'ADD CONSTRAINT fk_users_office_location FOREIGN KEY (office_location_id) REFERENCES office_locations(id)',
     );
     console.log('Added office_location_id column to users.');
+  } else {
+    const [officeLocIdCol] = await connection.query(
+      "SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS " +
+        "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = 'office_location_id'",
+      [process.env.DB_NAME],
+    );
+    if (officeLocIdCol[0]?.IS_NULLABLE === 'NO') {
+      await connection.query('ALTER TABLE users MODIFY COLUMN office_location_id INT NULL DEFAULT 1');
+      console.log('Made office_location_id nullable on users (NULL = allowed at all locations).');
+    }
   }
 
   const [attendanceCols] = await connection.query(

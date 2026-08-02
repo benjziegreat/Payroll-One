@@ -64,17 +64,19 @@ router.patch('/users/:id/bypass-geofence', requireAdmin, async (req, res) => {
 
 router.patch('/users/:id/office-location', requireAdmin, async (req, res) => {
   const { officeLocationId } = req.body || {};
-  if (typeof officeLocationId !== 'number') {
-    res.status(400).json({ error: 'officeLocationId must be a number' });
+  if (officeLocationId !== null && typeof officeLocationId !== 'number') {
+    res.status(400).json({ error: 'officeLocationId must be a number or null' });
     return;
   }
 
-  const [locationRows] = await pool.query('SELECT id FROM office_locations WHERE id = ?', [
-    officeLocationId,
-  ]);
-  if (locationRows.length === 0) {
-    res.status(404).json({ error: 'Office location not found' });
-    return;
+  if (officeLocationId !== null) {
+    const [locationRows] = await pool.query('SELECT id FROM office_locations WHERE id = ?', [
+      officeLocationId,
+    ]);
+    if (locationRows.length === 0) {
+      res.status(404).json({ error: 'Office location not found' });
+      return;
+    }
   }
 
   await pool.query('UPDATE users SET office_location_id = ? WHERE id = ?', [

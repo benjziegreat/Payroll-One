@@ -11,7 +11,7 @@ export interface AdminUserRow {
   role: UserRole;
   bypassGeofence: boolean;
   photoUrl: string | null;
-  officeLocationId: number;
+  officeLocationId: number | null;
   officeLocationName: string | null;
   lastAction: AttendanceAction | null;
   lastSeenAt: string | null;
@@ -58,7 +58,7 @@ export class AdminService {
     });
   }
 
-  async setUserOfficeLocation(userId: string, officeLocationId: number): Promise<void> {
+  async setUserOfficeLocation(userId: string, officeLocationId: number | null): Promise<void> {
     this.assertLocal();
     await this.localApi.request(`/admin/users/${userId}/office-location`, {
       method: 'PATCH',

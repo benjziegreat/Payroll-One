@@ -76,14 +76,15 @@ export class AdminUsersPage {
   }
 
   async assignOfficeLocation(user: AdminUserRow, officeLocationId: string) {
-    const id = Number(officeLocationId);
+    const id = officeLocationId === '' ? null : Number(officeLocationId);
     if (id === user.officeLocationId) return;
 
     this.pendingId.set(user.id);
     this.error.set(null);
     try {
       await this.adminService.setUserOfficeLocation(user.id, id);
-      const officeLocationName = this.officeLocations().find((l) => l.id === id)?.name ?? null;
+      const officeLocationName =
+        id === null ? null : this.officeLocations().find((l) => l.id === id)?.name ?? null;
       this.users.update((list) =>
         list.map((u) =>
           u.id === user.id ? { ...u, officeLocationId: id, officeLocationName } : u,

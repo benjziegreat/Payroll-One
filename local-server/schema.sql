@@ -20,7 +20,10 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(255) NOT NULL,
   full_name VARCHAR(255) NOT NULL,
   role ENUM('employee', 'admin') NOT NULL DEFAULT 'employee',
-  office_location_id INT NOT NULL DEFAULT 1,
+  -- NULL means "not tied to a single location" — the user can clock in/out
+  -- from any branch, since checkGeofence() treats a missing office the same
+  -- as bypass_geofence (see local-server/attendance-helpers.js).
+  office_location_id INT NULL DEFAULT 1,
   bypass_geofence TINYINT(1) NOT NULL DEFAULT 0,
   photo_url VARCHAR(255) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
