@@ -107,7 +107,11 @@ export class AuthService {
       this.localApi.setToken(token);
       this.user.set(user);
       this.cacheUser(user);
-      this.deviceIdentity.rememberPassword(user, password);
+      // Awaited deliberately — this runs right before AuthPage navigates
+      // away, and a fire-and-forget write here can lose the race against
+      // that navigation (or the tab backgrounding on mobile right after a
+      // successful login) before the IndexedDB write actually commits.
+      await this.deviceIdentity.rememberPassword(user, password);
       return;
     }
 
@@ -128,8 +132,10 @@ export class AuthService {
       this.localApi.setToken(token);
       this.user.set(user);
       this.cacheUser(user);
-      this.refreshDeviceIdentity(user);
-      this.deviceIdentity.rememberPassword(user, password);
+      // Awaited for the same reason as signUp() above — must commit before
+      // this resolves, since the caller navigates away right after.
+      await this.refreshDeviceIdentity(user);
+      await this.deviceIdentity.rememberPassword(user, password);
       return;
     }
 
@@ -147,7 +153,8 @@ export class AuthService {
     );
     // Already have a server-confirmed descriptor+user pair from this exact
     // call — cache it directly rather than doing a second round trip.
-    this.deviceIdentity.remember(user, Array.from(descriptor));
+    // Awaited before returning, same reasoning as signIn()/signUp() above.
+    await this.deviceIdentity.remember(user, Array.from(descriptor));
     this.localApi.setToken(token);
     this.user.set(user);
     this.cacheUser(user);

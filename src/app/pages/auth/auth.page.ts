@@ -23,6 +23,11 @@ export class AuthPage implements OnDestroy {
   private readonly router = inject(Router);
 
   readonly isOnline = this.offlineQueue.isOnline;
+  readonly cachedDeviceCount = signal<number | null>(null);
+
+  constructor() {
+    this.deviceIdentity.count().then((count) => this.cachedDeviceCount.set(count));
+  }
 
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('faceVideo');
   private stream: MediaStream | null = null;

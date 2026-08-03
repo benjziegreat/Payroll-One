@@ -109,6 +109,12 @@ export class DeviceIdentityService {
     });
   }
 
+  /** How many users this device currently has ANY offline credential cached for — a quick way to check "did caching ever actually happen" without guessing. */
+  async count(): Promise<number> {
+    const users = await withStore<KnownUserEntry[]>('readonly', (store) => store.getAll());
+    return users.length;
+  }
+
   async forget(userId: string) {
     await withStore('readwrite', (store) => store.delete(userId));
   }
