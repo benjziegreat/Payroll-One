@@ -12,7 +12,7 @@ const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 const MAX_OCCURRED_AT_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 router.post('/', async (req, res) => {
-  const { action, method, latitude, longitude, occurredAt, clientEventId } = req.body || {};
+  const { action, method, latitude, longitude, occurredAt, clientEventId, offlineSync } = req.body || {};
   if (!['login', 'logout'].includes(action) || !['face', 'fingerprint'].includes(method)) {
     res.status(400).json({ error: 'Invalid action or method' });
     return;
@@ -49,10 +49,18 @@ router.post('/', async (req, res) => {
     }
   }
 
-  const geofence = await checkGeofence(pool, req.userId, latitude, longitude);
-  if (!geofence.ok) {
-    res.status(geofence.status).json({ error: geofence.error, distance: geofence.distance });
-    return;
+  // A deferred retry of an already-queued offline entry — the geofence
+  // check already ran (or couldn't) at the moment it was captured; re-
+  // running it now against those same stored coordinates only adds a way
+  // for ordinary GPS drift to permanently strand an entry that can never be
+  // retried into passing. The live, first-attempt path below still enforces
+  // it normally.
+  if (!offlineSync) {
+    const geofence = await checkGeofence(pool, req.userId, latitude, longitude);
+    if (!geofence.ok) {
+      res.status(geofence.status).json({ error: geofence.error, distance: geofence.distance });
+      return;
+    }
   }
 
   await pool.query(

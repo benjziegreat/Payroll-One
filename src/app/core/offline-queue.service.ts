@@ -163,7 +163,7 @@ export class OfflineQueueService {
             entry.latitude !== undefined && entry.longitude !== undefined
               ? { latitude: entry.latitude, longitude: entry.longitude }
               : undefined,
-            { occurredAt: entry.occurredAt, clientEventId: entry.clientEventId },
+            { occurredAt: entry.occurredAt, clientEventId: entry.clientEventId, offlineSync: true },
           );
           await withStore('readwrite', (store) => store.delete(entry.clientEventId));
         } catch (err) {

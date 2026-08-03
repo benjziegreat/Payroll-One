@@ -21,6 +21,16 @@ export interface LogEventOptions {
   occurredAt?: string;
   /** Idempotency key so a retried offline sync can't double-insert. */
   clientEventId?: string;
+  /**
+   * True only for OfflineQueueService's deferred retry of an already-queued
+   * entry — never for the initial live attempt. Tells the server to trust
+   * the coordinates captured at the time rather than re-running the
+   * geofence check against them now: that check already ran (or was
+   * unreachable) at capture time, and re-validating stale coordinates later
+   * only adds a way for ordinary GPS drift to permanently strand a
+   * legitimate offline clock-in/out that can never be retried into passing.
+   */
+  offlineSync?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -47,6 +57,7 @@ export class AttendanceService {
           ...location,
           occurredAt: options?.occurredAt,
           clientEventId: options?.clientEventId,
+          offlineSync: options?.offlineSync,
         },
       });
       return;
