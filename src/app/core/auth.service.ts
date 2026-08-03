@@ -4,6 +4,7 @@ import { environment } from '../../environments/environment';
 import { DeviceIdentityService } from './device-identity.service';
 import { FaceService } from './face.service';
 import { LocalApiService, OfflineError } from './local-api.service';
+import { OfflineQueueService } from './offline-queue.service';
 import { SupabaseService } from './supabase.service';
 import type { AppUser } from './types';
 
@@ -28,6 +29,7 @@ export class AuthService {
     private readonly localApi: LocalApiService,
     private readonly faceService: FaceService,
     private readonly deviceIdentity: DeviceIdentityService,
+    private readonly offlineQueue: OfflineQueueService,
   ) {
     this.readyPromise = this.isLocal ? this.initLocal() : this.initSupabase();
   }
@@ -68,6 +70,7 @@ export class AuthService {
         this.user.set(user);
         this.cacheUser(user);
         this.refreshDeviceIdentity(user);
+        this.offlineQueue.clearNeedsReauth();
       } catch (err) {
         if (err instanceof OfflineError) {
           // Can't reach the server to confirm the session, but the token
@@ -112,6 +115,7 @@ export class AuthService {
       // that navigation (or the tab backgrounding on mobile right after a
       // successful login) before the IndexedDB write actually commits.
       await this.deviceIdentity.rememberPassword(user, password);
+      this.offlineQueue.clearNeedsReauth();
       return;
     }
 
@@ -136,6 +140,7 @@ export class AuthService {
       // this resolves, since the caller navigates away right after.
       await this.refreshDeviceIdentity(user);
       await this.deviceIdentity.rememberPassword(user, password);
+      this.offlineQueue.clearNeedsReauth();
       return;
     }
 
@@ -158,6 +163,7 @@ export class AuthService {
     this.localApi.setToken(token);
     this.user.set(user);
     this.cacheUser(user);
+    this.offlineQueue.clearNeedsReauth();
   }
 
   async signOut() {

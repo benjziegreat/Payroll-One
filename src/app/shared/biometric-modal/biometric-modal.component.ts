@@ -12,7 +12,10 @@ import {
 } from '@angular/core';
 import { AuthService } from '../../core/auth.service';
 import type { BiometricMethod } from '../../core/attendance.service';
+import { DeviceIdentityService } from '../../core/device-identity.service';
 import { FaceService } from '../../core/face.service';
+import { OfflineError } from '../../core/local-api.service';
+import { OfflineQueueService } from '../../core/offline-queue.service';
 import { WebauthnService } from '../../core/webauthn.service';
 
 type Status = 'idle' | 'camera' | 'scanning' | 'verifying' | 'error';
@@ -26,6 +29,8 @@ type Status = 'idle' | 'camera' | 'scanning' | 'verifying' | 'error';
 export class BiometricModalComponent implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly faceService = inject(FaceService);
+  private readonly deviceIdentity = inject(DeviceIdentityService);
+  private readonly offlineQueue = inject(OfflineQueueService);
   private readonly webauthnService = inject(WebauthnService);
 
   readonly action = input.required<'login' | 'logout'>();
@@ -92,7 +97,7 @@ export class BiometricModalComponent implements OnInit, OnDestroy {
       }
 
       this.status.set('verifying');
-      const matched = await this.faceService.verifyAgainstEnrollment(user.id, descriptor);
+      const matched = await this.verifyFace(user.id, descriptor);
       if (matched) {
         this.stopCamera();
         this.success.emit('face');
@@ -104,6 +109,27 @@ export class BiometricModalComponent implements OnInit, OnDestroy {
       this.status.set('camera');
       this.errorMessage.set(err instanceof Error ? err.message : 'Face scan failed.');
     }
+  }
+
+  /** Verifies the live scan against the enrolled descriptor. Falls back to this device's offline-cached descriptor for the current user when the server can't be reached — the resulting clock-in/out still queues normally via OfflineQueueService once `success` is emitted, same as any other offline confirmation. */
+  private async verifyFace(userId: string, descriptor: Float32Array): Promise<boolean> {
+    if (!this.offlineQueue.isOnline()) {
+      return this.verifyFaceOffline(userId, descriptor);
+    }
+
+    try {
+      return await this.faceService.verifyAgainstEnrollment(userId, descriptor);
+    } catch (err) {
+      if (!(err instanceof OfflineError)) throw err;
+      return this.verifyFaceOffline(userId, descriptor);
+    }
+  }
+
+  private async verifyFaceOffline(userId: string, descriptor: Float32Array): Promise<boolean> {
+    if (!(await this.deviceIdentity.hasCachedFace(userId))) {
+      throw new Error("You're offline, and this device has no cached face data for you yet.");
+    }
+    return this.deviceIdentity.verifyOffline(userId, descriptor);
   }
 
   private async runFingerprint() {

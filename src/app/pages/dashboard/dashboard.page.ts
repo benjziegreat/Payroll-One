@@ -46,6 +46,7 @@ export class DashboardPage implements OnDestroy {
 
   readonly user = this.auth.user;
   readonly isOfflineSession = this.auth.isOfflineSession;
+  readonly needsReauth = this.offlineQueue.needsReauth;
   readonly fullName = computed(
     () => (this.user()?.user_metadata?.['full_name'] as string | undefined) ?? this.user()?.email,
   );
@@ -77,9 +78,33 @@ export class DashboardPage implements OnDestroy {
   readonly pendingSyncCount = this.offlineQueue.pendingCount;
   readonly syncing = this.offlineQueue.syncing;
 
-  readonly officeLocation = signal<AssignedOfficeLocation | null>(null);
+  /** The office this user is directly assigned to — null if they're assigned "All locations" instead. */
+  readonly assignedOfficeLocation = signal<AssignedOfficeLocation | null>(null);
+  readonly allOfficeLocations = signal<AssignedOfficeLocation[]>([]);
   readonly position = this.geoService.position;
   readonly geoError = this.geoService.error;
+
+  /** For "All locations" users, whichever branch is nearest their live position — recomputed as position() updates. Null until a GPS fix and the office list are both available. */
+  readonly nearestOfficeLocation = computed<AssignedOfficeLocation | null>(() => {
+    const offices = this.allOfficeLocations();
+    const pos = this.position();
+    if (!pos || offices.length === 0) return null;
+
+    let best: AssignedOfficeLocation | null = null;
+    let bestDistance = Infinity;
+    for (const office of offices) {
+      const distance = GeoService.distanceMeters(office, pos);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = office;
+      }
+    }
+    return best;
+  });
+
+  readonly officeLocation = computed(
+    () => this.assignedOfficeLocation() ?? this.nearestOfficeLocation(),
+  );
 
   readonly geofenceMinLabel = GeoService.formatDistance(GEOFENCE_MIN_RADIUS_METERS);
   readonly geofenceMaxLabel = GeoService.formatDistance(GEOFENCE_MAX_RADIUS_METERS);
@@ -118,11 +143,12 @@ export class DashboardPage implements OnDestroy {
     if (!user) return;
     this.loading.set(true);
 
-    const [history, face, fingerprint, officeLocation] = await Promise.all([
+    const [history, face, fingerprint, officeLocation, allOfficeLocations] = await Promise.all([
       this.attendanceService.getHistory(user.id, 1).catch(() => null),
       this.faceService.isEnrolled(user.id).catch(() => false),
       this.webauthnService.isEnrolled(user.id).catch(() => false),
       this.officeLocationService.get().catch(() => null),
+      this.officeLocationService.getAll().catch(() => []),
     ]);
 
     if (history) {
@@ -139,7 +165,8 @@ export class DashboardPage implements OnDestroy {
       this.lastAt.set(cached?.at ?? null);
     }
 
-    this.officeLocation.set(officeLocation);
+    this.assignedOfficeLocation.set(officeLocation);
+    this.allOfficeLocations.set(allOfficeLocations);
     this.photoUrl.set(user.user_metadata?.photo_url ?? null);
 
     const methods: BiometricMethod[] = [];

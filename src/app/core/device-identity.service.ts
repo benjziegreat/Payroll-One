@@ -137,6 +137,23 @@ export class DeviceIdentityService {
     return toAppUser(best);
   }
 
+  async hasCachedFace(userId: string): Promise<boolean> {
+    const entry = await withStore<KnownUserEntry | undefined>('readonly', (store) =>
+      store.get(userId),
+    );
+    return !!entry?.faceDescriptor;
+  }
+
+  /** Verifies a live face scan against THIS specific user's cached descriptor — for confirming an already-signed-in user (dashboard clock in/out), not identifying an unknown one. */
+  async verifyOffline(userId: string, liveDescriptor: Float32Array): Promise<boolean> {
+    const entry = await withStore<KnownUserEntry | undefined>('readonly', (store) =>
+      store.get(userId),
+    );
+    if (!entry?.faceDescriptor) return false;
+    const distance = euclideanDistance(entry.faceDescriptor, Array.from(liveDescriptor));
+    return distance <= MATCH_THRESHOLD;
+  }
+
   async matchPasswordOffline(email: string, password: string): Promise<AppUser | null> {
     const entry = await withStore<KnownUserEntry | undefined>('readonly', (store) =>
       store.index(EMAIL_INDEX).get(email),

@@ -8,9 +8,16 @@
       </div>
     </div>
 
-    @if (isOfflineSession()) {
+    @if (isOfflineSession() || needsReauth()) {
       <div class="card stack" style="gap: var(--space-2)">
-        <p class="text-sm">Signed in from this device's offline cache — some pages need a real connection.</p>
+        <p class="text-sm">
+          @if (needsReauth()) {
+            Your session's expired, so {{ pendingSyncCount() }}
+            {{ pendingSyncCount() === 1 ? 'entry is' : 'entries are' }} stuck waiting to sync.
+          } @else {
+            Signed in from this device's offline cache — some pages need a real connection.
+          }
+        </p>
         <button class="btn btn-ghost" type="button" (click)="reconnect()">
           Confirm identity online to fully sync
         </button>

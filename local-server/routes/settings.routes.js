@@ -24,4 +24,15 @@ router.get('/office-location', async (req, res) => {
   res.status(200).json({ location });
 });
 
+// All office locations with coordinates set — lets a user assigned to "All
+// locations" (office_location_id null) figure out which branch is nearest
+// to them client-side, to mirror what checkGeofence does server-side.
+router.get('/office-locations', async (_req, res) => {
+  const [rows] = await pool.query(
+    'SELECT id, name, latitude, longitude FROM office_locations ' +
+      'WHERE latitude IS NOT NULL AND longitude IS NOT NULL ORDER BY id',
+  );
+  res.status(200).json({ locations: rows });
+});
+
 module.exports = router;

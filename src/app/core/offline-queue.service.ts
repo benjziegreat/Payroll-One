@@ -5,6 +5,7 @@ import {
   type BiometricMethod,
 } from './attendance.service';
 import type { Coordinates } from './geo.service';
+import { UnauthorizedError } from './local-api.service';
 
 const DB_NAME = 'payroll_one_offline';
 const DB_VERSION = 1;
@@ -69,6 +70,8 @@ export class OfflineQueueService {
 
   readonly pendingCount = signal(0);
   readonly syncing = signal(false);
+  /** The server rejected a sync as unauthenticated (expired/missing session) — retrying won't help until the user confirms their identity online again. Cleared by clearNeedsReauth() once they do. */
+  readonly needsReauth = signal(false);
 
   private flushing = false;
 
@@ -133,8 +136,16 @@ export class OfflineQueueService {
     await this.refreshPendingCount();
   }
 
+  /** Call after the user confirms their identity online again (a fresh sign-in) — clears the stuck state and immediately retries whatever's still queued. */
+  clearNeedsReauth() {
+    this.needsReauth.set(false);
+    this.flush();
+  }
+
   async flush() {
-    if (this.flushing || this.forcedOffline()) return;
+    // Retrying wouldn't help — same expired/missing token, same rejection —
+    // so don't hammer the server until the user actually re-authenticates.
+    if (this.flushing || this.forcedOffline() || this.needsReauth()) return;
     this.flushing = true;
     this.syncing.set(true);
     try {
@@ -155,9 +166,16 @@ export class OfflineQueueService {
             { occurredAt: entry.occurredAt, clientEventId: entry.clientEventId },
           );
           await withStore('readwrite', (store) => store.delete(entry.clientEventId));
-        } catch {
-          // Still can't reach the server — stop here, keep the rest queued
-          // in order, and let the next online event / retry tick try again.
+        } catch (err) {
+          if (err instanceof UnauthorizedError) {
+            // Retrying this (or anything queued behind it) can't succeed
+            // until the user signs in online again — stop and surface that,
+            // rather than silently retrying the same rejection forever.
+            this.needsReauth.set(true);
+          }
+          // Still can't reach the server, or just hit the reauth wall above
+          // — stop here, keep the rest queued in order, and let the next
+          // online event / retry tick (or clearNeedsReauth()) try again.
           break;
         }
       }

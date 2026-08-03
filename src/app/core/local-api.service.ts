@@ -17,6 +17,21 @@ export class OfflineError extends Error {
   }
 }
 
+/**
+ * The server WAS reached and explicitly rejected the request as
+ * unauthenticated (missing/expired/invalid token) — as opposed to
+ * OfflineError, where there was no response at all. Callers that retry on
+ * failure (e.g. OfflineQueueService) need to tell these apart: retrying an
+ * expired token changes nothing, so treating this the same as "still
+ * offline" would retry forever without ever succeeding.
+ */
+export class UnauthorizedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UnauthorizedError';
+  }
+}
+
 @Injectable({ providedIn: 'root' })
 export class LocalApiService {
   getToken(): string | null {
@@ -44,11 +59,7 @@ export class LocalApiService {
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     });
 
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error((data as { error?: string }).error ?? `Request failed (${response.status})`);
-    }
-    return data as T;
+    return this.parseResponse<T>(response);
   }
 
   async uploadFile<T>(path: string, fieldName: string, file: File): Promise<T> {
@@ -65,9 +76,15 @@ export class LocalApiService {
       body,
     });
 
+    return this.parseResponse<T>(response);
+  }
+
+  private async parseResponse<T>(response: Response): Promise<T> {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error((data as { error?: string }).error ?? `Request failed (${response.status})`);
+      const message = (data as { error?: string }).error ?? `Request failed (${response.status})`;
+      if (response.status === 401) throw new UnauthorizedError(message);
+      throw new Error(message);
     }
     return data as T;
   }

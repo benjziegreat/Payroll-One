@@ -5,6 +5,7 @@ import { LocalApiService } from './local-api.service';
 import { SupabaseService } from './supabase.service';
 
 const CACHE_KEY = 'payroll_one_office_location_cache';
+const ALL_CACHE_KEY = 'payroll_one_office_locations_cache';
 
 export interface AssignedOfficeLocation extends Coordinates {
   id: number;
@@ -34,6 +35,34 @@ export class OfficeLocationService {
       if (cached) return JSON.parse(cached) as AssignedOfficeLocation;
       throw err;
     }
+  }
+
+  /** Every office location that has coordinates set — lets a caller assigned to "All locations" (get() resolves to null) work out which branch is nearest to them. */
+  async getAll(): Promise<AssignedOfficeLocation[]> {
+    try {
+      const locations = await this.fetchAll();
+      localStorage.setItem(ALL_CACHE_KEY, JSON.stringify(locations));
+      return locations;
+    } catch (err) {
+      const cached = localStorage.getItem(ALL_CACHE_KEY);
+      if (cached) return JSON.parse(cached) as AssignedOfficeLocation[];
+      throw err;
+    }
+  }
+
+  private async fetchAll(): Promise<AssignedOfficeLocation[]> {
+    if (this.isLocal) {
+      const { locations } = await this.localApi.request<{ locations: AssignedOfficeLocation[] }>(
+        '/settings/office-locations',
+        { method: 'GET' },
+      );
+      return locations;
+    }
+
+    // Multi-location admin management is local-backend only for now (see
+    // fetch() below) — on Supabase there's just the single legacy location.
+    const single = await this.fetch();
+    return single ? [single] : [];
   }
 
   private async fetch(): Promise<AssignedOfficeLocation | null> {
