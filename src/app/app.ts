@@ -1,5 +1,6 @@
 import { Component, ElementRef, HostListener, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { SwUpdate } from '@angular/service-worker';
 import { AuthService } from './core/auth.service';
 import { OfflineQueueService } from './core/offline-queue.service';
 import { UserAvatarComponent } from './shared/user-avatar/user-avatar.component';
@@ -14,7 +15,22 @@ export class App {
   protected readonly auth = inject(AuthService);
   protected readonly offlineQueue = inject(OfflineQueueService);
   private readonly router = inject(Router);
+  private readonly swUpdate = inject(SwUpdate);
   private readonly elementRef: ElementRef<HTMLElement> = inject(ElementRef);
+
+  constructor() {
+    // Without this, an already-open tab keeps running whatever JS it loaded
+    // with — a new deploy downloads in the background but never takes over
+    // until something explicitly activates it. That silently stale code is
+    // especially misleading while iterating on offline behavior itself.
+    if (this.swUpdate.isEnabled) {
+      this.swUpdate.versionUpdates.subscribe((event) => {
+        if (event.type === 'VERSION_READY') {
+          this.swUpdate.activateUpdate().then(() => document.location.reload());
+        }
+      });
+    }
+  }
 
   protected readonly isAdmin = computed(() => this.auth.user()?.user_metadata?.role === 'admin');
   protected readonly isOnline = this.offlineQueue.effectiveOnline;

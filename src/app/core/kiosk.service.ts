@@ -10,11 +10,69 @@ export interface KioskResult {
   action: AttendanceAction;
 }
 
+export interface KioskDirectoryCredential {
+  credentialId: string;
+  transports: string[];
+}
+
+export interface KioskDirectoryUser {
+  userId: string;
+  fullName: string;
+  photoUrl: string | null;
+  faceDescriptor: number[] | null;
+  credentials: KioskDirectoryCredential[];
+  lastAction: AttendanceAction | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class KioskService {
   private readonly isLocal = environment.backend === 'local';
 
   constructor(private readonly localApi: LocalApiService) {}
+
+  async getOfflineSupport(): Promise<boolean> {
+    this.assertLocal();
+    const { enabled } = await this.localApi.request<{ enabled: boolean }>('/kiosk/offline-support', {
+      method: 'GET',
+      auth: false,
+    });
+    return enabled;
+  }
+
+  async getDirectory(): Promise<KioskDirectoryUser[]> {
+    this.assertLocal();
+    const { users } = await this.localApi.request<{ users: KioskDirectoryUser[] }>(
+      '/kiosk/directory',
+      { method: 'GET', auth: false },
+    );
+    return users;
+  }
+
+  async syncFace(
+    descriptor: number[],
+    location: Coordinates | undefined,
+    occurredAt: string,
+    clientEventId: string,
+  ): Promise<KioskResult> {
+    this.assertLocal();
+    return this.localApi.request<KioskResult>('/kiosk/sync', {
+      auth: false,
+      body: { type: 'face', descriptor, ...location, occurredAt, clientEventId },
+    });
+  }
+
+  async syncFingerprint(
+    assertion: unknown,
+    location: Coordinates | undefined,
+    occurredAt: string,
+    clientEventId: string,
+  ): Promise<KioskResult> {
+    this.assertLocal();
+    return this.localApi.request<KioskResult>('/kiosk/sync', {
+      auth: false,
+      body: { type: 'fingerprint', assertion, ...location, occurredAt, clientEventId },
+    });
+  }
 
   async identifyByFace(
     descriptor: Float32Array,

@@ -38,6 +38,23 @@ router.get('/status', async (req, res) => {
   res.status(200).json({ enrolled: rows.length > 0 });
 });
 
+// Lets the signed-in device cache the caller's own descriptor locally, so
+// this device can identify them via a local face match (see
+// DeviceIdentityService) if it's ever offline when they need to sign back
+// in. Scoped to the caller's own record only — not the bulk directory dump
+// the kiosk's /kiosk/directory exposes.
+router.get('/my-descriptor', async (req, res) => {
+  const [rows] = await pool.query(
+    'SELECT descriptor FROM face_enrollments WHERE user_id = ?',
+    [req.userId],
+  );
+  if (rows.length === 0) {
+    res.status(404).json({ error: 'Not enrolled' });
+    return;
+  }
+  res.status(200).json({ descriptor: rows[0].descriptor });
+});
+
 router.post('/verify', async (req, res) => {
   const { descriptor } = req.body || {};
   if (!Array.isArray(descriptor)) {

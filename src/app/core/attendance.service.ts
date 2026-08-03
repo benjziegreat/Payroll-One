@@ -61,22 +61,33 @@ export class AttendanceService {
   }
 
   async getHistory(userId: string, limit = 50): Promise<AttendanceLog[]> {
-    if (this.isLocal) {
-      const { logs } = await this.localApi.request<{ logs: AttendanceLog[] }>(
-        `/attendance?limit=${limit}`,
-        { method: 'GET' },
-      );
+    const cacheKey = `payroll_one_history_cache_${userId}`;
+    try {
+      let logs: AttendanceLog[];
+      if (this.isLocal) {
+        ({ logs } = await this.localApi.request<{ logs: AttendanceLog[] }>(
+          `/attendance?limit=${limit}`,
+          { method: 'GET' },
+        ));
+      } else {
+        const { data, error } = await this.supabase.client
+          .from('attendance_logs')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(limit);
+        if (error) throw error;
+        logs = data as AttendanceLog[];
+      }
+      localStorage.setItem(cacheKey, JSON.stringify(logs));
       return logs;
+    } catch (err) {
+      // Offline — fall back to the last-fetched DTR history rather than
+      // leaving the History page with nothing to show at all.
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) return JSON.parse(cached) as AttendanceLog[];
+      throw err;
     }
-
-    const { data, error } = await this.supabase.client
-      .from('attendance_logs')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(limit);
-    if (error) throw error;
-    return data as AttendanceLog[];
   }
 
   async getLastAction(userId: string): Promise<AttendanceAction | null> {

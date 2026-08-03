@@ -5,6 +5,12 @@
       <p class="text-muted text-sm">Scan your face or fingerprint — no sign-in needed.</p>
     </div>
 
+    @if (pendingSyncCount() > 0) {
+      <p class="badge text-center">
+        {{ pendingSyncCount() }} {{ pendingSyncCount() === 1 ? 'entry' : 'entries' }} waiting to sync.
+      </p>
+    }
+
     @switch (status()) {
       @case ('idle') {
         <div class="card stack">
@@ -50,6 +56,9 @@
           <span class="badge badge--success">
             {{ result()!.action === 'login' ? 'Clocked in' : 'Clocked out' }}
           </span>
+          @if (result()!.queued) {
+            <p class="text-muted text-sm">Saved offline — will sync automatically once reconnected.</p>
+          }
           <button class="btn btn-primary" type="button" (click)="reset()">Done</button>
         </div>
       }

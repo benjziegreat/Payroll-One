@@ -12,6 +12,32 @@
       <p class="error">{{ error() }}</p>
     }
 
+    <div class="card stack">
+      <div class="stack" style="gap: 4px">
+        <p class="location-row__name">Offline kiosk mode</p>
+        <p class="text-muted text-sm">
+          Lets the kiosk keep identifying employees by face or fingerprint and queue clock
+          in/out events when it can't reach the server, syncing them automatically once it
+          can. This caches every enrolled employee's face descriptor and fingerprint
+          credential id on the kiosk device itself — only turn it on for kiosks you trust
+          physically.
+        </p>
+      </div>
+      @if (kioskOfflineLoading()) {
+        <p class="text-muted text-sm">Loading…</p>
+      } @else {
+        <button
+          class="btn"
+          [class.btn-primary]="kioskOfflineEnabled()"
+          type="button"
+          [disabled]="kioskOfflinePending()"
+          (click)="toggleKioskOfflineSupport()"
+        >
+          {{ kioskOfflineEnabled() ? 'Offline kiosk mode: On' : 'Offline kiosk mode: Off' }}
+        </button>
+      }
+    </div>
+
     @if (!creating()) {
       <button class="btn" type="button" (click)="startCreate()">Add office location</button>
     } @else {

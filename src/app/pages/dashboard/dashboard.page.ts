@@ -45,6 +45,7 @@ export class DashboardPage implements OnDestroy {
   private readonly router = inject(Router);
 
   readonly user = this.auth.user;
+  readonly isOfflineSession = this.auth.isOfflineSession;
   readonly fullName = computed(
     () => (this.user()?.user_metadata?.['full_name'] as string | undefined) ?? this.user()?.email,
   );
@@ -201,6 +202,15 @@ export class DashboardPage implements OnDestroy {
 
   manageEnrollment() {
     this.router.navigateByUrl('/enroll');
+  }
+
+  // Offline sessions (see AuthService.isOfflineSession) carry no server
+  // token, so guestGuard would otherwise just bounce a still-"signed in"
+  // user straight back here — sign out locally first so /auth actually asks
+  // them to confirm their identity and get a real session.
+  async reconnect() {
+    await this.auth.signOut();
+    this.router.navigateByUrl('/auth');
   }
 
   async onPhotoSelected(event: Event) {

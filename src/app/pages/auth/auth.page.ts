@@ -3,7 +3,11 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../core/auth.service';
+import { DeviceIdentityService } from '../../core/device-identity.service';
 import { FaceService } from '../../core/face.service';
+import { OfflineError } from '../../core/local-api.service';
+import { OfflineQueueService } from '../../core/offline-queue.service';
+import type { AppUser } from '../../core/types';
 
 @Component({
   selector: 'app-auth-page',
@@ -14,7 +18,11 @@ import { FaceService } from '../../core/face.service';
 export class AuthPage implements OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly faceService = inject(FaceService);
+  private readonly deviceIdentity = inject(DeviceIdentityService);
+  private readonly offlineQueue = inject(OfflineQueueService);
   private readonly router = inject(Router);
+
+  readonly isOnline = this.offlineQueue.isOnline;
 
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('faceVideo');
   private stream: MediaStream | null = null;
@@ -55,7 +63,7 @@ export class AuthPage implements OnDestroy {
           this.setMode('signin');
         }
       } else {
-        await this.auth.signIn(this.email, this.password);
+        await this.signInWithOfflineFallback(this.email, this.password);
         await this.router.navigateByUrl('/dashboard');
       }
     } catch (err) {
@@ -63,6 +71,34 @@ export class AuthPage implements OnDestroy {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  private async signInWithOfflineFallback(email: string, password: string) {
+    // Known offline — don't even attempt /auth/signin (it would just hang
+    // or slowly time out); go straight to the last-successful-login
+    // credentials cached on this device.
+    if (!this.isOnline()) {
+      await this.restoreFromCacheOrThrow(() => this.deviceIdentity.matchPasswordOffline(email, password));
+      return;
+    }
+
+    try {
+      await this.auth.signIn(email, password);
+    } catch (err) {
+      // The browser thought it was online but the request still failed
+      // (server down, captive portal, etc.) — only then fall back to the
+      // cache; a reachable server rejecting the password stays authoritative.
+      if (!(err instanceof OfflineError)) throw err;
+      await this.restoreFromCacheOrThrow(() => this.deviceIdentity.matchPasswordOffline(email, password));
+    }
+  }
+
+  private async restoreFromCacheOrThrow(lookup: () => Promise<AppUser | null>) {
+    const cachedUser = await lookup();
+    if (!cachedUser) {
+      throw new Error("You're offline, and no cached sign-in is available for this device yet.");
+    }
+    this.auth.restoreOfflineSession(cachedUser);
   }
 
   async openFaceSignIn() {
@@ -95,7 +131,22 @@ export class AuthPage implements OnDestroy {
         return;
       }
 
-      await this.auth.signInWithFace(descriptor);
+      if (!this.isOnline()) {
+        // Known offline — skip straight to the cached descriptor match
+        // instead of waiting on a /kiosk-style request that can't succeed.
+        await this.restoreFromCacheOrThrow(() => this.deviceIdentity.matchOffline(descriptor));
+      } else {
+        try {
+          await this.auth.signInWithFace(descriptor);
+        } catch (err) {
+          // Only fall back to this device's offline-cached identity when the
+          // server was genuinely unreachable — a server that IS reachable
+          // and says "not recognized" is authoritative.
+          if (!(err instanceof OfflineError)) throw err;
+          await this.restoreFromCacheOrThrow(() => this.deviceIdentity.matchOffline(descriptor));
+        }
+      }
+
       this.closeFaceSignIn();
       await this.router.navigateByUrl('/dashboard');
     } catch (err) {

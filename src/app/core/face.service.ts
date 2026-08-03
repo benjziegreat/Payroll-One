@@ -132,6 +132,29 @@ export class FaceService {
     }
   }
 
+  /** The caller's own stored descriptor, or null if not enrolled. Used to seed DeviceIdentityService's offline sign-in cache — never anyone else's. */
+  async getMyDescriptor(userId: string): Promise<number[] | null> {
+    if (this.isLocal) {
+      try {
+        const { descriptor } = await this.localApi.request<{ descriptor: number[] }>(
+          '/face/my-descriptor',
+          { method: 'GET' },
+        );
+        return descriptor;
+      } catch {
+        return null;
+      }
+    }
+
+    const { data, error } = await this.supabase.client
+      .from('face_enrollments')
+      .select('descriptor')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) throw error;
+    return (data?.descriptor as number[] | undefined) ?? null;
+  }
+
   async verifyAgainstEnrollment(userId: string, liveDescriptor: Float32Array): Promise<boolean> {
     await this.ensureModelsLoaded();
 

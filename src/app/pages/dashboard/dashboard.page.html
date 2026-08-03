@@ -8,6 +8,15 @@
       </div>
     </div>
 
+    @if (isOfflineSession()) {
+      <div class="card stack" style="gap: var(--space-2)">
+        <p class="text-sm">Signed in from this device's offline cache — some pages need a real connection.</p>
+        <button class="btn btn-ghost" type="button" (click)="reconnect()">
+          Confirm identity online to fully sync
+        </button>
+      </div>
+    }
+
     @if (!isOnline() || pendingSyncCount() > 0) {
       <p class="badge" [class.badge--success]="isOnline()">
         @if (!isOnline()) {

@@ -196,6 +196,26 @@ router.delete('/office-locations/:id', requireAdmin, async (req, res) => {
   }
 });
 
+router.get('/kiosk-offline-support', requireAdmin, async (_req, res) => {
+  const [rows] = await pool.query('SELECT offline_enabled FROM kiosk_settings WHERE id = 1');
+  res.status(200).json({ enabled: !!rows[0]?.offline_enabled });
+});
+
+router.patch('/kiosk-offline-support', requireAdmin, async (req, res) => {
+  const { enabled } = req.body || {};
+  if (typeof enabled !== 'boolean') {
+    res.status(400).json({ error: 'enabled must be a boolean' });
+    return;
+  }
+
+  await pool.query(
+    'INSERT INTO kiosk_settings (id, offline_enabled) VALUES (1, ?) ' +
+      'ON DUPLICATE KEY UPDATE offline_enabled = VALUES(offline_enabled)',
+    [enabled ? 1 : 0],
+  );
+  res.status(200).json({ ok: true });
+});
+
 router.get('/attendance-logs', async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 100, 500);
 

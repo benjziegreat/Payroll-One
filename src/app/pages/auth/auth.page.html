@@ -5,6 +5,12 @@
       <p class="text-muted text-sm">Biometric attendance, secured by Supabase.</p>
     </div>
 
+    @if (!isOnline()) {
+      <p class="badge">
+        Offline — Login/Logout still work and sync automatically once you're back online.
+      </p>
+    }
+
     <div class="tabs">
       <button
         type="button"

@@ -64,6 +64,18 @@ CREATE TABLE IF NOT EXISTS webauthn_kiosk_challenges (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Single-row admin toggle. Off by default: enabling it means every enrolled
+-- employee's face descriptor and WebAuthn public key gets cached into the
+-- kiosk device's browser storage so it can identify people while the server
+-- is unreachable — a real exposure on a shared/public device, so this is
+-- opt-in rather than always-on.
+CREATE TABLE IF NOT EXISTS kiosk_settings (
+  id TINYINT PRIMARY KEY DEFAULT 1,
+  offline_enabled TINYINT(1) NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT IGNORE INTO kiosk_settings (id, offline_enabled) VALUES (1, 0);
+
 CREATE TABLE IF NOT EXISTS attendance_logs (
   id CHAR(36) PRIMARY KEY,
   user_id CHAR(36) NOT NULL,

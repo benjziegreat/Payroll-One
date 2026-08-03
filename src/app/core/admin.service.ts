@@ -102,6 +102,23 @@ export class AdminService {
     await this.localApi.request(`/admin/office-locations/${id}`, { method: 'DELETE' });
   }
 
+  async getKioskOfflineSupport(): Promise<boolean> {
+    this.assertLocal();
+    const { enabled } = await this.localApi.request<{ enabled: boolean }>(
+      '/admin/kiosk-offline-support',
+      { method: 'GET' },
+    );
+    return enabled;
+  }
+
+  async setKioskOfflineSupport(enabled: boolean): Promise<void> {
+    this.assertLocal();
+    await this.localApi.request('/admin/kiosk-offline-support', {
+      method: 'PATCH',
+      body: { enabled },
+    });
+  }
+
   async getAttendanceLogs(limit = 200): Promise<AdminAttendanceLogRow[]> {
     this.assertLocal();
     const { logs } = await this.localApi.request<{ logs: AdminAttendanceLogRow[] }>(

@@ -1,6 +1,8 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, computed, signal } from '@angular/core';
 import type { Session } from '@supabase/supabase-js';
 import { environment } from '../../environments/environment';
+import { DeviceIdentityService } from './device-identity.service';
+import { FaceService } from './face.service';
 import { LocalApiService, OfflineError } from './local-api.service';
 import { SupabaseService } from './supabase.service';
 import type { AppUser } from './types';
@@ -14,13 +16,37 @@ export class AuthService {
   readonly ready = signal(false);
   readonly readyPromise: Promise<void>;
 
+  /** True once signed in from this device's offline face-match cache rather than a real server-issued token — API calls needing auth will fail until the user confirms their identity online again (see restoreOfflineSession). */
+  readonly isOfflineSession = computed(
+    () => this.isLocal && !!this.user() && !this.localApi.getToken(),
+  );
+
   private readonly isLocal = environment.backend === 'local';
 
   constructor(
     private readonly supabase: SupabaseService,
     private readonly localApi: LocalApiService,
+    private readonly faceService: FaceService,
+    private readonly deviceIdentity: DeviceIdentityService,
   ) {
     this.readyPromise = this.isLocal ? this.initLocal() : this.initSupabase();
+  }
+
+  /** Best-effort — caches this device's own face descriptor for offline sign-in. Never throws. */
+  private async refreshDeviceIdentity(user: AppUser) {
+    try {
+      const descriptor = await this.faceService.getMyDescriptor(user.id);
+      if (descriptor) await this.deviceIdentity.remember(user, descriptor);
+    } catch {
+      // Offline or not enrolled — nothing to cache yet, not an error.
+    }
+  }
+
+  /** Restores a session identified via DeviceIdentityService's local face match when the server can't be reached at all. No token exists for this session — isOfflineSession() will be true until the user confirms their identity online again. */
+  restoreOfflineSession(user: AppUser) {
+    this.user.set(user);
+    this.cacheUser(user);
+    this.ready.set(true);
   }
 
   private async initSupabase() {
@@ -41,6 +67,7 @@ export class AuthService {
         const { user } = await this.localApi.request<{ user: AppUser }>('/auth/me');
         this.user.set(user);
         this.cacheUser(user);
+        this.refreshDeviceIdentity(user);
       } catch (err) {
         if (err instanceof OfflineError) {
           // Can't reach the server to confirm the session, but the token
@@ -80,6 +107,7 @@ export class AuthService {
       this.localApi.setToken(token);
       this.user.set(user);
       this.cacheUser(user);
+      this.deviceIdentity.rememberPassword(user, password);
       return;
     }
 
@@ -100,6 +128,8 @@ export class AuthService {
       this.localApi.setToken(token);
       this.user.set(user);
       this.cacheUser(user);
+      this.refreshDeviceIdentity(user);
+      this.deviceIdentity.rememberPassword(user, password);
       return;
     }
 
@@ -115,6 +145,9 @@ export class AuthService {
       '/auth/face-signin',
       { body: { descriptor: Array.from(descriptor) }, auth: false },
     );
+    // Already have a server-confirmed descriptor+user pair from this exact
+    // call — cache it directly rather than doing a second round trip.
+    this.deviceIdentity.remember(user, Array.from(descriptor));
     this.localApi.setToken(token);
     this.user.set(user);
     this.cacheUser(user);

@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
+import { DeviceIdentityService } from '../../core/device-identity.service';
 import { FaceService } from '../../core/face.service';
 import { WebauthnService } from '../../core/webauthn.service';
 
@@ -21,6 +22,7 @@ import { WebauthnService } from '../../core/webauthn.service';
 export class EnrollPage implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly faceService = inject(FaceService);
+  private readonly deviceIdentity = inject(DeviceIdentityService);
   private readonly webauthnService = inject(WebauthnService);
   private readonly router = inject(Router);
 
@@ -80,6 +82,7 @@ export class EnrollPage implements OnInit, OnDestroy {
         return;
       }
       await this.faceService.saveEnrollment(user.id, descriptor);
+      await this.deviceIdentity.remember(user, Array.from(descriptor));
       this.faceEnrolled.set(true);
       this.closeFaceCamera();
     } catch (err) {

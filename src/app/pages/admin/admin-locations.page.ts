@@ -32,8 +32,13 @@ export class AdminLocationsPage {
   readonly editingId = signal<number | null>(null);
   readonly editForm = signal<LocationForm>({ ...EMPTY_FORM });
 
+  readonly kioskOfflineEnabled = signal(false);
+  readonly kioskOfflineLoading = signal(true);
+  readonly kioskOfflinePending = signal(false);
+
   constructor() {
     this.load();
+    this.loadKioskOfflineSupport();
   }
 
   private async load() {
@@ -45,6 +50,31 @@ export class AdminLocationsPage {
       this.error.set(err instanceof Error ? err.message : 'Could not load office locations.');
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  private async loadKioskOfflineSupport() {
+    this.kioskOfflineLoading.set(true);
+    try {
+      this.kioskOfflineEnabled.set(await this.adminService.getKioskOfflineSupport());
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Could not load kiosk offline setting.');
+    } finally {
+      this.kioskOfflineLoading.set(false);
+    }
+  }
+
+  async toggleKioskOfflineSupport() {
+    const next = !this.kioskOfflineEnabled();
+    this.kioskOfflinePending.set(true);
+    this.error.set(null);
+    try {
+      await this.adminService.setKioskOfflineSupport(next);
+      this.kioskOfflineEnabled.set(next);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Could not update kiosk offline setting.');
+    } finally {
+      this.kioskOfflinePending.set(false);
     }
   }
 
