@@ -8,6 +8,7 @@ export interface AppUser {
     role?: UserRole;
     photo_url?: string | null;
     require_selfie_verification?: boolean;
+    bypass_geofence?: boolean;
     [key: string]: unknown;
   };
 }

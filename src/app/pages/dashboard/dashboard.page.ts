@@ -57,6 +57,7 @@ export class DashboardPage implements OnDestroy {
   readonly requireSelfieVerification = computed(
     () => !!this.user()?.user_metadata?.require_selfie_verification,
   );
+  readonly bypassGeofence = computed(() => !!this.user()?.user_metadata?.bypass_geofence);
 
   private readonly photoVideo = viewChild<ElementRef<HTMLVideoElement>>('photoVideo');
   private photoStream: MediaStream | null = null;
@@ -151,6 +152,7 @@ export class DashboardPage implements OnDestroy {
   });
 
   readonly withinRange = computed(() => {
+    if (this.bypassGeofence()) return true;
     if (!this.officeLocation()) return true;
     return this.rangeStatus() === 'in-range';
   });

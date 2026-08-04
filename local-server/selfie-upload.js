@@ -15,16 +15,25 @@ const SELFIE_TYPES = {
   'video/quicktime': '.mov',
 };
 
+// MediaRecorder's actual mimeType is typically e.g.
+// "video/webm;codecs=vp8,opus" — a bare lookup against SELFIE_TYPES would
+// reject every real recording, since browsers essentially never omit the
+// codecs parameter for webm/mp4 capture.
+function baseMimeType(mimetype) {
+  return (mimetype || '').split(';')[0].trim();
+}
+
 const uploadSelfie = multer({
   storage: multer.diskStorage({
     destination: selfiesDir,
     filename: (_req, file, cb) => {
-      cb(null, `${crypto.randomUUID()}${SELFIE_TYPES[file.mimetype]}`);
+      const extension = SELFIE_TYPES[baseMimeType(file.mimetype)] ?? '.webm';
+      cb(null, `${crypto.randomUUID()}${extension}`);
     },
   }),
   limits: { fileSize: 25 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (SELFIE_TYPES[file.mimetype]) cb(null, true);
+    if (SELFIE_TYPES[baseMimeType(file.mimetype)]) cb(null, true);
     else cb(new Error('Only WebM, MP4, or QuickTime video is allowed'));
   },
 });

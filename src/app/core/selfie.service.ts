@@ -8,7 +8,11 @@ const EXTENSION_BY_TYPE: Record<string, string> = {
 };
 
 function fileFor(blob: Blob): File {
-  const extension = EXTENSION_BY_TYPE[blob.type] ?? '.webm';
+  // blob.type from MediaRecorder is typically e.g. "video/webm;codecs=vp8,opus" — strip
+  // the codecs parameter before looking up an extension (cosmetic only; the server
+  // re-derives the real extension from the same base type on its own).
+  const baseType = blob.type.split(';')[0].trim();
+  const extension = EXTENSION_BY_TYPE[baseType] ?? '.webm';
   return new File([blob], `selfie${extension}`, { type: blob.type || 'video/webm' });
 }
 
@@ -22,6 +26,7 @@ export class SelfieService {
       `/attendance/${clientEventId}/selfie`,
       'selfie',
       fileFor(blob),
+      'PATCH',
     );
     return selfieUrl;
   }
@@ -31,6 +36,7 @@ export class SelfieService {
       `/kiosk/${clientEventId}/selfie`,
       'selfie',
       fileFor(blob),
+      'PATCH',
     );
     return selfieUrl;
   }

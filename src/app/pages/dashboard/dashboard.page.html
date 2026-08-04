@@ -109,15 +109,19 @@
           @if (distanceLabel() !== null) {
             <p [class]="withinRange() ? 'success' : 'error'">
               {{ distanceLabel() }} from {{ officeLocation()!.name }}
-              @switch (rangeStatus()) {
-                @case ('too-close') {
-                  — too close, must be {{ geofenceMinLabel }}–{{ geofenceMaxLabel }} away to clock in/out
-                }
-                @case ('too-far') {
-                  — too far, must be {{ geofenceMinLabel }}–{{ geofenceMaxLabel }} away to clock in/out
-                }
-                @case ('in-range') {
-                  — in range
+              @if (bypassGeofence() && rangeStatus() !== 'in-range') {
+                — outside range, but you're allowed to clock in/out anyway
+              } @else {
+                @switch (rangeStatus()) {
+                  @case ('too-close') {
+                    — too close, must be {{ geofenceMinLabel }}–{{ geofenceMaxLabel }} away to clock in/out
+                  }
+                  @case ('too-far') {
+                    — too far, must be {{ geofenceMinLabel }}–{{ geofenceMaxLabel }} away to clock in/out
+                  }
+                  @case ('in-range') {
+                    — in range
+                  }
                 }
               }
             </p>

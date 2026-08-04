@@ -62,7 +62,12 @@ export class LocalApiService {
     return this.parseResponse<T>(response);
   }
 
-  async uploadFile<T>(path: string, fieldName: string, file: File): Promise<T> {
+  async uploadFile<T>(
+    path: string,
+    fieldName: string,
+    file: File,
+    method: 'POST' | 'PATCH' = 'POST',
+  ): Promise<T> {
     const headers: Record<string, string> = {};
     const token = this.getToken();
     if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -71,7 +76,7 @@ export class LocalApiService {
     body.append(fieldName, file);
 
     const response = await this.fetch(`${environment.localApiBase}${path}`, {
-      method: 'POST',
+      method,
       headers,
       body,
     });

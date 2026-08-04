@@ -29,7 +29,18 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const browserDist = path.join(__dirname, '..', 'dist', 'payroll-one', 'browser');
 app.use(express.static(browserDist));
-app.get(/^\/(?!api\/).*/, (_req, res) => {
+app.get(/^\/(?!api\/).*/, (req, res) => {
+  // A request for an actual file (has an extension) that express.static
+  // above didn't find is a missing/stale build asset — e.g. a browser tab
+  // still holding an old index.html asking for a JS chunk that a newer `ng
+  // build` deleted. Serving index.html for that (200, text/html) makes the
+  // browser choke with a confusing "expected a JS module" MIME error;
+  // a real 404 lets Angular's own chunk-load-failure handling kick in
+  // instead. Only extension-less paths are real Angular routes.
+  if (path.extname(req.path)) {
+    res.status(404).end();
+    return;
+  }
   res.sendFile(path.join(browserDist, 'index.html'));
 });
 
