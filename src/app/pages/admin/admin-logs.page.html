@@ -14,7 +14,7 @@
       </p>
     } @else {
       <div class="log-list">
-        @for (log of logs(); track log.created_at + (log.user_id ?? '')) {
+        @for (log of logs(); track logKey(log)) {
           <div class="log-row card">
             <app-user-avatar [photoUrl]="log.photo_url" [fullName]="log.full_name ?? ''" />
 
@@ -34,6 +34,16 @@
                 <span class="text-muted">(synced later)</span>
               }
             </span>
+
+            @if (log.selfie_url) {
+              <button class="btn btn-ghost" type="button" (click)="toggleSelfie(log)">
+                {{ expandedSelfieKey() === logKey(log) ? 'Hide selfie' : 'View selfie' }}
+              </button>
+            }
+
+            @if (log.selfie_url && expandedSelfieKey() === logKey(log)) {
+              <video class="log-row__selfie" [src]="log.selfie_url" controls></video>
+            }
           </div>
         }
       </div>

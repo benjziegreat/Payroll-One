@@ -12,6 +12,7 @@ export interface AttendanceLog {
   user_id: string;
   action: AttendanceAction;
   method: BiometricMethod;
+  selfie_url?: string | null;
   occurred_at?: string | null;
   created_at: string;
 }

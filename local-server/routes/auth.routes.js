@@ -24,6 +24,7 @@ function toPublicUser(row) {
       full_name: row.full_name,
       role: row.role ?? 'employee',
       photo_url: row.photo_url ?? null,
+      require_selfie_verification: !!row.require_selfie_verification,
     },
   };
 }

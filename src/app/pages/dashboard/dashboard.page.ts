@@ -22,7 +22,10 @@ import { OfficeLocationService, type AssignedOfficeLocation } from '../../core/o
 import { OfflineQueueService } from '../../core/offline-queue.service';
 import { ProfilePhotoService } from '../../core/profile-photo.service';
 import { WebauthnService } from '../../core/webauthn.service';
-import { BiometricModalComponent } from '../../shared/biometric-modal/biometric-modal.component';
+import {
+  BiometricModalComponent,
+  type BiometricConfirmResult,
+} from '../../shared/biometric-modal/biometric-modal.component';
 import { UserAvatarComponent } from '../../shared/user-avatar/user-avatar.component';
 
 const GEOFENCE_MIN_RADIUS_METERS = 0;
@@ -50,6 +53,9 @@ export class DashboardPage implements OnDestroy {
   readonly needsReauth = this.offlineQueue.needsReauth;
   readonly fullName = computed(
     () => (this.user()?.user_metadata?.['full_name'] as string | undefined) ?? this.user()?.email,
+  );
+  readonly requireSelfieVerification = computed(
+    () => !!this.user()?.user_metadata?.require_selfie_verification,
   );
 
   private readonly photoVideo = viewChild<ElementRef<HTMLVideoElement>>('photoVideo');
@@ -217,7 +223,7 @@ export class DashboardPage implements OnDestroy {
     this.modalOpen.set(true);
   }
 
-  async onSuccess(method: BiometricMethod) {
+  async onSuccess({ method, selfieBlob }: BiometricConfirmResult) {
     const user = this.user();
     if (!user) return;
     const action = this.nextAction();
@@ -239,6 +245,7 @@ export class DashboardPage implements OnDestroy {
       occurredAt,
       clientEventId,
       this.officeLocation()?.id,
+      selfieBlob,
     );
     this.justLogged.set({ action, method, queued });
   }

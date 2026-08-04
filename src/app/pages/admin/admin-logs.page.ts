@@ -23,6 +23,7 @@ export class AdminLogsPage implements OnDestroy {
   readonly logs = signal<AdminAttendanceLogRow[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+  readonly expandedSelfieKey = signal<string | null>(null);
 
   constructor() {
     this.load();
@@ -44,6 +45,15 @@ export class AdminLogsPage implements OnDestroy {
 
   displayTime(log: AdminAttendanceLogRow): string {
     return log.occurred_at ?? log.created_at;
+  }
+
+  logKey(log: AdminAttendanceLogRow): string {
+    return log.created_at + (log.user_id ?? '');
+  }
+
+  toggleSelfie(log: AdminAttendanceLogRow) {
+    const key = this.logKey(log);
+    this.expandedSelfieKey.set(this.expandedSelfieKey() === key ? null : key);
   }
 
   wasSyncedLate(log: AdminAttendanceLogRow): boolean {

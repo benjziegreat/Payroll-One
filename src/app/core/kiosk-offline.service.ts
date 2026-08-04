@@ -3,11 +3,13 @@ import type { AttendanceAction, BiometricMethod } from './attendance.service';
 import type { Coordinates } from './geo.service';
 import { KioskService, type KioskDirectoryUser, type KioskResult } from './kiosk.service';
 import { OfflineError } from './local-api.service';
+import { SelfieService } from './selfie.service';
 
 const DB_NAME = 'payroll_one_kiosk_offline';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const DIRECTORY_STORE = 'directory';
 const PENDING_STORE = 'pending';
+const PENDING_SELFIE_STORE = 'pending_selfies';
 const RETRY_INTERVAL_MS = 15000;
 const FACE_MATCH_THRESHOLD = 0.55;
 
@@ -23,11 +25,17 @@ interface PendingKioskEntry {
   occurredAt: string;
 }
 
+interface PendingSelfieEntry {
+  clientEventId: string;
+  blob: Blob;
+}
+
 export interface OfflineMatch {
   userId: string;
   fullName: string;
   photoUrl: string | null;
   action: AttendanceAction;
+  requireSelfieVerification: boolean;
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -40,6 +48,9 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(PENDING_STORE)) {
         db.createObjectStore(PENDING_STORE, { keyPath: 'clientEventId' });
+      }
+      if (!db.objectStoreNames.contains(PENDING_SELFIE_STORE)) {
+        db.createObjectStore(PENDING_SELFIE_STORE, { keyPath: 'clientEventId' });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -104,7 +115,10 @@ export class KioskOfflineService {
   private flushing = false;
   private refreshing = false;
 
-  constructor(private readonly kioskService: KioskService) {
+  constructor(
+    private readonly kioskService: KioskService,
+    private readonly selfieService: SelfieService,
+  ) {
     window.addEventListener('online', () => {
       this.refreshDirectory();
       this.flush();
@@ -165,6 +179,7 @@ export class KioskOfflineService {
       fullName: best.fullName,
       photoUrl: best.photoUrl,
       action: nextAction(best.lastAction),
+      requireSelfieVerification: best.requireSelfieVerification,
     };
   }
 
@@ -192,6 +207,7 @@ export class KioskOfflineService {
         fullName: user.fullName,
         photoUrl: user.photoUrl,
         action: nextAction(user.lastAction),
+        requireSelfieVerification: user.requireSelfieVerification,
       },
       assertion,
     };
@@ -241,6 +257,14 @@ export class KioskOfflineService {
     await this.refreshPendingCount();
   }
 
+  /** Queues a recorded selfie video to attach to a kiosk attendance log by clientEventId — independent of the identify/sync queue above, so it retries with plain connectivity and doesn't depend on offline kiosk mode being enabled (the selfie-attach endpoint has no such gate). */
+  async queueSelfie(clientEventId: string, blob: Blob) {
+    await withStore(PENDING_SELFIE_STORE, 'readwrite', (store) =>
+      store.put({ clientEventId, blob }),
+    );
+    await this.refreshPendingCount();
+  }
+
   async flush() {
     if (this.flushing || !navigator.onLine) return;
     this.flushing = true;
@@ -282,6 +306,26 @@ export class KioskOfflineService {
           // queued behind it.
           this.lastSyncError.set(err instanceof Error ? err.message : 'A queued entry failed to sync.');
           await withStore(PENDING_STORE, 'readwrite', (store) => store.delete(entry.clientEventId));
+        }
+      }
+
+      const selfies = await withStore<PendingSelfieEntry[]>(PENDING_SELFIE_STORE, 'readonly', (store) =>
+        store.getAll(),
+      );
+      for (const selfie of selfies) {
+        try {
+          await this.selfieService.uploadForKiosk(selfie.clientEventId, selfie.blob);
+          await withStore(PENDING_SELFIE_STORE, 'readwrite', (store) =>
+            store.delete(selfie.clientEventId),
+          );
+        } catch (err) {
+          if (err instanceof OfflineError) break;
+          // The attendance log this was meant to attach to never actually
+          // landed (e.g. its own sync got dropped) — can't recover by
+          // retrying, so drop it rather than blocking newer selfies behind it.
+          await withStore(PENDING_SELFIE_STORE, 'readwrite', (store) =>
+            store.delete(selfie.clientEventId),
+          );
         }
       }
     } finally {
@@ -329,6 +373,9 @@ export class KioskOfflineService {
     const entries = await withStore<PendingKioskEntry[]>(PENDING_STORE, 'readonly', (store) =>
       store.getAll(),
     );
-    this.pendingCount.set(entries.length);
+    const selfies = await withStore<PendingSelfieEntry[]>(PENDING_SELFIE_STORE, 'readonly', (store) =>
+      store.getAll(),
+    );
+    this.pendingCount.set(entries.length + selfies.length);
   }
 }

@@ -1,11 +1,13 @@
 const express = require('express');
 const crypto = require('crypto');
+const fs = require('fs');
 const {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
 } = require('@simplewebauthn/server');
 const { pool } = require('../db');
 const { checkGeofence, getNextAction } = require('../attendance-helpers');
+const { uploadSelfie } = require('../selfie-upload');
 
 const FACE_MATCH_THRESHOLD = 0.55;
 const CHALLENGE_TTL_MS = 2 * 60 * 1000;
@@ -55,14 +57,16 @@ async function matchFace(descriptor) {
 async function identifyAndLog(res, userId, method, latitude, longitude, clientEventId, options = {}) {
   const { occurredAt = null, skipGeofence = false } = options;
 
-  const [userRows] = await pool.query('SELECT full_name, photo_url FROM users WHERE id = ?', [
-    userId,
-  ]);
+  const [userRows] = await pool.query(
+    'SELECT full_name, photo_url, require_selfie_verification FROM users WHERE id = ?',
+    [userId],
+  );
   const user = userRows[0];
   if (!user) {
     res.status(404).json({ error: 'User not found' });
     return;
   }
+  const requireSelfieVerification = !!user.require_selfie_verification;
 
   if (clientEventId) {
     const [existing] = await pool.query(
@@ -74,6 +78,7 @@ async function identifyAndLog(res, userId, method, latitude, longitude, clientEv
         fullName: user.full_name,
         photoUrl: user.photo_url,
         action: existing[0].action,
+        requireSelfieVerification,
       });
       return;
     }
@@ -107,7 +112,12 @@ async function identifyAndLog(res, userId, method, latitude, longitude, clientEv
     ],
   );
 
-  res.status(200).json({ fullName: user.full_name, photoUrl: user.photo_url, action });
+  res.status(200).json({
+    fullName: user.full_name,
+    photoUrl: user.photo_url,
+    action,
+    requireSelfieVerification,
+  });
 }
 
 router.post('/face', async (req, res) => {
@@ -238,7 +248,7 @@ router.get('/directory', async (_req, res) => {
   }
 
   const [users] = await pool.query(
-    `SELECT u.id, u.full_name, u.photo_url, fe.descriptor AS face_descriptor,
+    `SELECT u.id, u.full_name, u.photo_url, u.require_selfie_verification, fe.descriptor AS face_descriptor,
             l.action AS last_action
      FROM users u
      LEFT JOIN face_enrollments fe ON fe.user_id = u.id
@@ -265,7 +275,48 @@ router.get('/directory', async (_req, res) => {
       faceDescriptor: row.face_descriptor ?? null,
       credentials: credentialsByUser.get(row.id) ?? [],
       lastAction: row.last_action ?? null,
+      requireSelfieVerification: !!row.require_selfie_verification,
     })),
+  });
+});
+
+// Attaches a video selfie to a kiosk-created attendance log, looked up by
+// clientEventId — same idempotent-attach pattern as the authenticated
+// /attendance/:clientEventId/selfie, just without a user_id check since the
+// kiosk has no session (trusted the same way the rest of /kiosk/* is: by
+// having network access to this endpoint at all).
+router.patch('/:clientEventId/selfie', (req, res) => {
+  uploadSelfie.single('selfie')(req, res, async (err) => {
+    if (err) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ error: 'No selfie video uploaded' });
+      return;
+    }
+
+    const [rows] = await pool.query(
+      'SELECT selfie_url FROM attendance_logs WHERE client_event_id = ?',
+      [req.params.clientEventId],
+    );
+    if (rows.length === 0) {
+      fs.unlink(req.file.path, () => {});
+      res.status(404).json({ error: 'Attendance log not found for this event yet' });
+      return;
+    }
+    if (rows[0].selfie_url) {
+      fs.unlink(req.file.path, () => {});
+      res.status(200).json({ selfieUrl: rows[0].selfie_url });
+      return;
+    }
+
+    const selfieUrl = `/uploads/selfies/${req.file.filename}`;
+    await pool.query('UPDATE attendance_logs SET selfie_url = ? WHERE client_event_id = ?', [
+      selfieUrl,
+      req.params.clientEventId,
+    ]);
+    res.status(200).json({ selfieUrl });
   });
 });
 

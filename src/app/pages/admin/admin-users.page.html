@@ -70,6 +70,17 @@
                 >
                   {{ user.bypassGeofence ? 'Allowed beyond ' + geofenceMaxLabel : 'Allow beyond ' + geofenceMaxLabel }}
                 </button>
+
+                <button
+                  class="btn"
+                  [class.btn-primary]="user.requireSelfieVerification"
+                  type="button"
+                  [disabled]="pendingId() === user.id"
+                  (click)="toggleRequireSelfie(user)"
+                  title="Whether this employee must record a video selfie to clock in/out. Everyone else can still choose to, or skip it."
+                >
+                  {{ user.requireSelfieVerification ? 'Selfie required' : 'Selfie optional' }}
+                </button>
               </div>
             </div>
           }

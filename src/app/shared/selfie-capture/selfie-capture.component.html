@@ -1,0 +1,40 @@
+<div class="stack">
+  @if (status() === 'camera' || status() === 'recording') {
+    <div class="video-frame">
+      <video #video playsinline muted autoplay></video>
+      @if (status() === 'recording') {
+        <span class="video-frame__badge">● {{ recordedSeconds() }}s</span>
+      }
+    </div>
+
+    @if (errorMessage()) {
+      <p class="error">{{ errorMessage() }}</p>
+    }
+
+    @if (status() === 'camera') {
+      <button class="btn btn-primary" type="button" (click)="startRecording()">Start recording</button>
+      @if (!required()) {
+        <button class="btn btn-ghost" type="button" (click)="skip()">Skip video selfie</button>
+      }
+    } @else {
+      <p class="text-muted text-sm text-center">Recording — up to 8 seconds.</p>
+      <button class="btn btn-primary" type="button" (click)="stopRecording()">Stop recording</button>
+    }
+  } @else if (status() === 'preview') {
+    <div class="video-frame">
+      <video #previewVideo playsinline controls></video>
+    </div>
+    <div class="row">
+      <button class="btn btn-primary" type="button" (click)="confirm()">Use this video</button>
+      <button class="btn btn-ghost" type="button" (click)="retake()">Retake</button>
+    </div>
+    @if (!required()) {
+      <button class="btn btn-ghost" type="button" (click)="skip()">Skip instead</button>
+    }
+  } @else {
+    <p class="error">{{ errorMessage() }}</p>
+    @if (!required()) {
+      <button class="btn btn-ghost" type="button" (click)="skip()">Continue without video</button>
+    }
+  }
+</div>

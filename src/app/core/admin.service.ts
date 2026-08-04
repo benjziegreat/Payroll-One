@@ -10,6 +10,7 @@ export interface AdminUserRow {
   email: string;
   role: UserRole;
   bypassGeofence: boolean;
+  requireSelfieVerification: boolean;
   photoUrl: string | null;
   officeLocationId: number | null;
   officeLocationName: string | null;
@@ -32,6 +33,7 @@ export interface AdminAttendanceLogRow {
   photo_url: string | null;
   action: AttendanceAction;
   method: BiometricMethod;
+  selfie_url: string | null;
   occurred_at: string | null;
   created_at: string;
 }
@@ -55,6 +57,14 @@ export class AdminService {
     await this.localApi.request(`/admin/users/${userId}/bypass-geofence`, {
       method: 'PATCH',
       body: { bypassGeofence },
+    });
+  }
+
+  async setRequireSelfieVerification(userId: string, requireSelfieVerification: boolean): Promise<void> {
+    this.assertLocal();
+    await this.localApi.request(`/admin/users/${userId}/require-selfie`, {
+      method: 'PATCH',
+      body: { requireSelfieVerification },
     });
   }
 

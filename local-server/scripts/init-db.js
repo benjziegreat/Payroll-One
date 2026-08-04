@@ -31,7 +31,7 @@ async function main() {
   const [userCols] = await connection.query(
     "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS " +
       "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME IN " +
-      "('role', 'bypass_geofence', 'photo_url', 'office_location_id')",
+      "('role', 'bypass_geofence', 'photo_url', 'office_location_id', 'require_selfie_verification')",
     [process.env.DB_NAME],
   );
   const userColNames = userCols.map((row) => row.COLUMN_NAME);
@@ -50,6 +50,12 @@ async function main() {
   if (!userColNames.includes('photo_url')) {
     await connection.query('ALTER TABLE users ADD COLUMN photo_url VARCHAR(255) NULL');
     console.log('Added photo_url column to users.');
+  }
+  if (!userColNames.includes('require_selfie_verification')) {
+    await connection.query(
+      'ALTER TABLE users ADD COLUMN require_selfie_verification TINYINT(1) NOT NULL DEFAULT 0',
+    );
+    console.log('Added require_selfie_verification column to users.');
   }
 
   // Pre-multi-location installs had a single-row `office_location` table.
@@ -95,7 +101,8 @@ async function main() {
 
   const [attendanceCols] = await connection.query(
     "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS " +
-      "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'attendance_logs' AND COLUMN_NAME IN ('occurred_at', 'client_event_id')",
+      "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'attendance_logs' AND COLUMN_NAME IN " +
+      "('occurred_at', 'client_event_id', 'selfie_url')",
     [process.env.DB_NAME],
   );
   const attendanceColNames = attendanceCols.map((row) => row.COLUMN_NAME);
@@ -109,6 +116,10 @@ async function main() {
         'ADD UNIQUE KEY uq_attendance_client_event (client_event_id)',
     );
     console.log('Added client_event_id column to attendance_logs.');
+  }
+  if (!attendanceColNames.includes('selfie_url')) {
+    await connection.query('ALTER TABLE attendance_logs ADD COLUMN selfie_url VARCHAR(255) NULL');
+    console.log('Added selfie_url column to attendance_logs.');
   }
 
   await connection.end();

@@ -25,6 +25,10 @@ CREATE TABLE IF NOT EXISTS users (
   -- as bypass_geofence (see local-server/attendance-helpers.js).
   office_location_id INT NULL DEFAULT 1,
   bypass_geofence TINYINT(1) NOT NULL DEFAULT 0,
+  -- Off by default. When on, this employee can't complete a clock in/out
+  -- without recording a video selfie (see attendance_logs.selfie_url) —
+  -- everyone else still gets offered the option but can skip it.
+  require_selfie_verification TINYINT(1) NOT NULL DEFAULT 0,
   photo_url VARCHAR(255) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_users_office_location FOREIGN KEY (office_location_id) REFERENCES office_locations(id)
@@ -87,8 +91,12 @@ CREATE TABLE IF NOT EXISTS attendance_logs (
   -- offline and synced later. NULL means "same as created_at" (the normal,
   -- online path). created_at always reflects when the server received it.
   occurred_at TIMESTAMP NULL,
-  -- Client-generated id so a retried offline sync can't double-insert.
+  -- Client-generated id so a retried offline sync can't double-insert. Also
+  -- used to attach a selfie video after the fact (PATCH .../selfie), since
+  -- the video may finish uploading separately from (and later than) the log
+  -- row itself, especially when captured offline.
   client_event_id VARCHAR(36) NULL,
+  selfie_url VARCHAR(255) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_attendance_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   INDEX idx_attendance_user_created (user_id, created_at DESC),

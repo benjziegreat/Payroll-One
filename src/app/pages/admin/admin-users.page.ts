@@ -75,6 +75,22 @@ export class AdminUsersPage {
     }
   }
 
+  async toggleRequireSelfie(user: AdminUserRow) {
+    this.pendingId.set(user.id);
+    this.error.set(null);
+    const next = !user.requireSelfieVerification;
+    try {
+      await this.adminService.setRequireSelfieVerification(user.id, next);
+      this.users.update((list) =>
+        list.map((u) => (u.id === user.id ? { ...u, requireSelfieVerification: next } : u)),
+      );
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Could not update user.');
+    } finally {
+      this.pendingId.set(null);
+    }
+  }
+
   async assignOfficeLocation(user: AdminUserRow, officeLocationId: string) {
     const id = officeLocationId === '' ? null : Number(officeLocationId);
     if (id === user.officeLocationId) return;

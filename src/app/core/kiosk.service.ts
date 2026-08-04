@@ -8,6 +8,7 @@ export interface KioskResult {
   fullName: string;
   photoUrl: string | null;
   action: AttendanceAction;
+  requireSelfieVerification: boolean;
 }
 
 export interface KioskDirectoryCredential {
@@ -22,6 +23,7 @@ export interface KioskDirectoryUser {
   faceDescriptor: number[] | null;
   credentials: KioskDirectoryCredential[];
   lastAction: AttendanceAction | null;
+  requireSelfieVerification: boolean;
 }
 
 @Injectable({ providedIn: 'root' })

@@ -7,6 +7,7 @@ export interface AppUser {
     full_name?: string;
     role?: UserRole;
     photo_url?: string | null;
+    require_selfie_verification?: boolean;
     [key: string]: unknown;
   };
 }

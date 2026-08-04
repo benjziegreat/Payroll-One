@@ -4,15 +4,17 @@ import { GeoService, type Coordinates } from '../../core/geo.service';
 import { KioskOfflineService } from '../../core/kiosk-offline.service';
 import { KioskService, type KioskResult } from '../../core/kiosk.service';
 import { OfflineError } from '../../core/local-api.service';
+import { SelfieService } from '../../core/selfie.service';
 import { WebauthnService } from '../../core/webauthn.service';
+import { SelfieCaptureComponent } from '../../shared/selfie-capture/selfie-capture.component';
 import { UserAvatarComponent } from '../../shared/user-avatar/user-avatar.component';
 
-type Status = 'idle' | 'camera' | 'scanning' | 'fingerprint' | 'result' | 'error';
+type Status = 'idle' | 'camera' | 'scanning' | 'fingerprint' | 'selfie' | 'result' | 'error';
 type KioskUiResult = KioskResult & { queued?: boolean };
 
 @Component({
   selector: 'app-kiosk-page',
-  imports: [UserAvatarComponent],
+  imports: [UserAvatarComponent, SelfieCaptureComponent],
   templateUrl: './kiosk.page.html',
   styleUrl: './kiosk.page.scss',
 })
@@ -21,6 +23,7 @@ export class KioskPage implements OnDestroy {
   private readonly geoService = inject(GeoService);
   private readonly kioskService = inject(KioskService);
   private readonly kioskOfflineService = inject(KioskOfflineService);
+  private readonly selfieService = inject(SelfieService);
   private readonly webauthnService = inject(WebauthnService);
 
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
@@ -32,6 +35,9 @@ export class KioskPage implements OnDestroy {
   readonly errorMessage = signal('');
   readonly result = signal<KioskUiResult | null>(null);
   readonly pendingSyncCount = this.kioskOfflineService.pendingCount;
+
+  private pendingResult: KioskUiResult | null = null;
+  private pendingClientEventId: string | null = null;
 
   async chooseFace() {
     this.errorMessage.set('');
@@ -66,10 +72,10 @@ export class KioskPage implements OnDestroy {
       }
 
       const location = await this.getLocation();
-      const result = await this.identifyFace(descriptor, location, crypto.randomUUID());
+      const clientEventId = crypto.randomUUID();
+      const result = await this.identifyFace(descriptor, location, clientEventId);
       this.stopCamera();
-      this.result.set(result);
-      this.status.set('result');
+      this.beginSelfieStep(result, clientEventId);
     } catch (err) {
       this.status.set('camera');
       this.errorMessage.set(err instanceof Error ? err.message : 'Face not recognized.');
@@ -98,7 +104,13 @@ export class KioskPage implements OnDestroy {
 
       const occurredAt = new Date().toISOString();
       await this.kioskOfflineService.queueFace(match, descriptor, location, occurredAt, clientEventId);
-      return { fullName: match.fullName, photoUrl: match.photoUrl, action: match.action, queued: true };
+      return {
+        fullName: match.fullName,
+        photoUrl: match.photoUrl,
+        action: match.action,
+        requireSelfieVerification: match.requireSelfieVerification,
+        queued: true,
+      };
     }
   }
 
@@ -127,9 +139,9 @@ export class KioskPage implements OnDestroy {
     this.status.set('fingerprint');
     try {
       const location = await this.getLocation();
-      const result = await this.identifyFingerprint(location, crypto.randomUUID());
-      this.result.set(result);
-      this.status.set('result');
+      const clientEventId = crypto.randomUUID();
+      const result = await this.identifyFingerprint(location, clientEventId);
+      this.beginSelfieStep(result, clientEventId);
     } catch (err) {
       this.status.set('error');
       this.errorMessage.set(err instanceof Error ? err.message : 'Fingerprint not recognized.');
@@ -165,9 +177,47 @@ export class KioskPage implements OnDestroy {
         fullName: offline.match.fullName,
         photoUrl: offline.match.photoUrl,
         action: offline.match.action,
+        requireSelfieVerification: offline.match.requireSelfieVerification,
         queued: true,
       };
     }
+  }
+
+  private beginSelfieStep(result: KioskUiResult, clientEventId: string) {
+    this.pendingResult = result;
+    this.pendingClientEventId = clientEventId;
+    this.status.set('selfie');
+  }
+
+  get selfieRequired(): boolean {
+    return this.pendingResult?.requireSelfieVerification ?? false;
+  }
+
+  async onSelfieCaptured(blob: Blob) {
+    const clientEventId = this.pendingClientEventId;
+    if (clientEventId) {
+      try {
+        await this.selfieService.uploadForKiosk(clientEventId, blob);
+      } catch {
+        // Network drop or the attendance event itself is still queued
+        // (identify happened offline) — queue the selfie the same way,
+        // independent of the identify/sync queue, and it'll attach once
+        // both it and the log it belongs to have actually landed.
+        await this.kioskOfflineService.queueSelfie(clientEventId, blob);
+      }
+    }
+    this.finishResult();
+  }
+
+  onSelfieSkipped() {
+    this.finishResult();
+  }
+
+  private finishResult() {
+    this.result.set(this.pendingResult);
+    this.status.set('result');
+    this.pendingResult = null;
+    this.pendingClientEventId = null;
   }
 
   private async getLocation(): Promise<Coordinates | undefined> {

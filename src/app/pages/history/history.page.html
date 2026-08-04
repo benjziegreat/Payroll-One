@@ -26,6 +26,16 @@
                 <span class="text-muted">(synced later)</span>
               }
             </span>
+
+            @if (log.selfie_url) {
+              <button class="btn btn-ghost" type="button" (click)="toggleSelfie(log)">
+                {{ expandedSelfieId() === log.id ? 'Hide selfie' : 'View selfie' }}
+              </button>
+            }
+
+            @if (log.selfie_url && expandedSelfieId() === log.id) {
+              <video class="log-row__selfie" [src]="log.selfie_url" controls></video>
+            }
           </div>
         }
       </div>

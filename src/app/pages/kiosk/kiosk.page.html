@@ -49,6 +49,19 @@
         </div>
       }
 
+      @case ('selfie') {
+        <div class="card stack">
+          <p class="text-muted text-sm text-center">
+            {{ selfieRequired ? 'A video selfie is required to confirm this.' : 'Optional: record a video selfie, or skip.' }}
+          </p>
+          <app-selfie-capture
+            [required]="selfieRequired"
+            (captured)="onSelfieCaptured($event)"
+            (skipped)="onSelfieSkipped()"
+          />
+        </div>
+      }
+
       @case ('result') {
         <div class="card stack text-center">
           <app-user-avatar [photoUrl]="result()!.photoUrl" [fullName]="result()!.fullName" />

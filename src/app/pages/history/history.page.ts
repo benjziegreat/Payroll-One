@@ -18,6 +18,7 @@ export class HistoryPage {
   readonly logs = signal<AttendanceLog[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+  readonly expandedSelfieId = signal<string | null>(null);
 
   constructor() {
     this.load();
@@ -40,6 +41,10 @@ export class HistoryPage {
 
   displayTime(log: AttendanceLog): string {
     return log.occurred_at ?? log.created_at;
+  }
+
+  toggleSelfie(log: AttendanceLog) {
+    this.expandedSelfieId.set(this.expandedSelfieId() === log.id ? null : log.id);
   }
 
   wasSyncedLate(log: AttendanceLog): boolean {

@@ -1,8 +1,10 @@
 const express = require('express');
 const crypto = require('crypto');
+const fs = require('fs');
 const { pool } = require('../db');
 const { requireUser } = require('../auth');
 const { checkGeofence } = require('../attendance-helpers');
+const { uploadSelfie } = require('../selfie-upload');
 
 const router = express.Router();
 
@@ -86,10 +88,53 @@ router.post('/', async (req, res) => {
   res.status(200).json({ ok: true });
 });
 
+// Attaches a video selfie to an already-created attendance log, looked up by
+// the same clientEventId the log itself was created with. Separate from the
+// POST above because the video may finish uploading later (or fail and
+// retry independently) — especially when captured offline. Idempotent: if
+// this log already has a selfie attached, further calls are a no-op rather
+// than overwriting it.
+router.patch('/:clientEventId/selfie', (req, res) => {
+  uploadSelfie.single('selfie')(req, res, async (err) => {
+    if (err) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ error: 'No selfie video uploaded' });
+      return;
+    }
+
+    const [rows] = await pool.query(
+      'SELECT selfie_url FROM attendance_logs WHERE client_event_id = ? AND user_id = ?',
+      [req.params.clientEventId, req.userId],
+    );
+    if (rows.length === 0) {
+      fs.unlink(req.file.path, () => {});
+      res.status(404).json({ error: 'Attendance log not found for this event yet' });
+      return;
+    }
+    if (rows[0].selfie_url) {
+      // Already attached from a previous attempt — discard this duplicate.
+      fs.unlink(req.file.path, () => {});
+      res.status(200).json({ selfieUrl: rows[0].selfie_url });
+      return;
+    }
+
+    const selfieUrl = `/uploads/selfies/${req.file.filename}`;
+    await pool.query('UPDATE attendance_logs SET selfie_url = ? WHERE client_event_id = ? AND user_id = ?', [
+      selfieUrl,
+      req.params.clientEventId,
+      req.userId,
+    ]);
+    res.status(200).json({ selfieUrl });
+  });
+});
+
 router.get('/', async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 50, 200);
   const [rows] = await pool.query(
-    'SELECT id, user_id, action, method, occurred_at, created_at FROM attendance_logs ' +
+    'SELECT id, user_id, action, method, selfie_url, occurred_at, created_at FROM attendance_logs ' +
       'WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
     [req.userId, limit],
   );

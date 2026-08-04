@@ -21,6 +21,13 @@
   flex: 1;
 }
 
+.log-row__selfie {
+  flex: 1 0 100%;
+  max-width: 320px;
+  border-radius: var(--radius-sm);
+  background: #000;
+}
+
 @media (max-width: 480px) {
   .log-row {
     flex-wrap: wrap;

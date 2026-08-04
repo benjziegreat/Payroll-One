@@ -9,7 +9,7 @@ router.use(requireUser);
 
 router.get('/users', requireAdmin, async (_req, res) => {
   const [rows] = await pool.query(
-    `SELECT u.id, u.full_name, u.email, u.role, u.bypass_geofence, u.photo_url,
+    `SELECT u.id, u.full_name, u.email, u.role, u.bypass_geofence, u.require_selfie_verification, u.photo_url,
             u.office_location_id, ol.name AS office_location_name,
             ol.latitude AS office_latitude, ol.longitude AS office_longitude,
             l.latitude, l.longitude, l.action AS last_action, l.created_at AS last_seen_at
@@ -36,6 +36,7 @@ router.get('/users', requireAdmin, async (_req, res) => {
       email: row.email,
       role: row.role,
       bypassGeofence: !!row.bypass_geofence,
+      requireSelfieVerification: !!row.require_selfie_verification,
       photoUrl: row.photo_url,
       officeLocationId: row.office_location_id,
       officeLocationName: row.office_location_name,
@@ -57,6 +58,20 @@ router.patch('/users/:id/bypass-geofence', requireAdmin, async (req, res) => {
 
   await pool.query('UPDATE users SET bypass_geofence = ? WHERE id = ?', [
     bypassGeofence ? 1 : 0,
+    req.params.id,
+  ]);
+  res.status(200).json({ ok: true });
+});
+
+router.patch('/users/:id/require-selfie', requireAdmin, async (req, res) => {
+  const { requireSelfieVerification } = req.body || {};
+  if (typeof requireSelfieVerification !== 'boolean') {
+    res.status(400).json({ error: 'requireSelfieVerification must be a boolean' });
+    return;
+  }
+
+  await pool.query('UPDATE users SET require_selfie_verification = ? WHERE id = ?', [
+    requireSelfieVerification ? 1 : 0,
     req.params.id,
   ]);
   res.status(200).json({ ok: true });
@@ -223,7 +238,7 @@ router.get('/attendance-logs', async (req, res) => {
   const isAdmin = roleRows[0]?.role === 'admin';
 
   const [rows] = await pool.query(
-    `SELECT u.id AS user_id, u.full_name, u.photo_url, a.action, a.method, a.occurred_at, a.created_at
+    `SELECT u.id AS user_id, u.full_name, u.photo_url, a.action, a.method, a.selfie_url, a.occurred_at, a.created_at
      FROM attendance_logs a
      LEFT JOIN users u ON u.id = a.user_id
      ${isAdmin ? '' : 'WHERE a.user_id = ?'}

@@ -5,7 +5,22 @@
       <button class="btn btn-ghost modal__close" type="button" (click)="close()">✕</button>
     </div>
 
-    @if (!selectedMethod()) {
+    @if (status() === 'selfie') {
+      <p class="text-muted text-sm">
+        @if (requireSelfieVerification()) {
+          A video selfie is required to confirm this.
+        } @else {
+          Optional: record a video selfie, or skip.
+        }
+      </p>
+      <app-selfie-capture
+        [required]="requireSelfieVerification()"
+        (captured)="onSelfieCaptured($event)"
+        (skipped)="onSelfieSkipped()"
+      />
+    }
+
+    @if (!selectedMethod() && status() !== 'selfie') {
       <p class="text-muted text-sm">Choose how you'd like to verify it's you.</p>
       <div class="stack">
         @for (method of availableMethods(); track method) {
@@ -16,7 +31,7 @@
       </div>
     }
 
-    @if (selectedMethod() === 'face') {
+    @if (selectedMethod() === 'face' && status() !== 'selfie') {
       <div class="face-view stack">
         <div class="face-view__frame">
           <video #video playsinline muted></video>
@@ -45,7 +60,7 @@
       </div>
     }
 
-    @if (selectedMethod() === 'fingerprint') {
+    @if (selectedMethod() === 'fingerprint' && status() !== 'selfie') {
       <div class="stack text-center">
         @if (status() === 'verifying') {
           <p class="text-muted text-sm">Follow your device's prompt to confirm your fingerprint or face.</p>

@@ -6,6 +6,7 @@ import {
 } from './attendance.service';
 import type { Coordinates } from './geo.service';
 import { UnauthorizedError } from './local-api.service';
+import { SelfieService } from './selfie.service';
 
 const DB_NAME = 'payroll_one_offline';
 const DB_VERSION = 1;
@@ -22,6 +23,8 @@ export interface PendingAttendanceEntry {
   longitude?: number;
   occurredAt: string;
   officeLocationId?: number;
+  /** A recorded video selfie still waiting to be attached — see SelfieService. Stored directly in IndexedDB (Blobs are structured-clone-safe in modern browsers). */
+  selfieBlob?: Blob;
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -76,7 +79,10 @@ export class OfflineQueueService {
 
   private flushing = false;
 
-  constructor(private readonly attendanceService: AttendanceService) {
+  constructor(
+    private readonly attendanceService: AttendanceService,
+    private readonly selfieService: SelfieService,
+  ) {
     window.addEventListener('online', () => {
       this.isOnline.set(true);
       if (this.effectiveOnline()) this.flush();
@@ -106,6 +112,7 @@ export class OfflineQueueService {
     occurredAt: string,
     clientEventId: string,
     officeLocationId?: number,
+    selfieBlob?: Blob | null,
   ): Promise<{ queued: boolean }> {
     if (this.effectiveOnline()) {
       try {
@@ -114,6 +121,28 @@ export class OfflineQueueService {
           clientEventId,
           officeLocationId,
         });
+        if (selfieBlob) {
+          try {
+            await this.selfieService.uploadForAttendance(clientEventId, selfieBlob);
+          } catch {
+            // The clock-in/out itself already succeeded — only the video
+            // upload failed (e.g. connection dropped mid-upload). Queue just
+            // the retry rather than losing the recorded selfie; the
+            // attendance insert is idempotent by clientEventId so replaying
+            // it during flush() is harmless.
+            await this.enqueue({
+              clientEventId,
+              userId,
+              action,
+              method,
+              latitude: position?.latitude,
+              longitude: position?.longitude,
+              occurredAt,
+              officeLocationId,
+              selfieBlob,
+            });
+          }
+        }
         return { queued: false };
       } catch {
         // Could be a real server rejection (e.g. out of range) or just a
@@ -131,6 +160,7 @@ export class OfflineQueueService {
       longitude: position?.longitude,
       occurredAt,
       officeLocationId,
+      selfieBlob: selfieBlob ?? undefined,
     });
     return { queued: true };
   }
@@ -174,6 +204,12 @@ export class OfflineQueueService {
               officeLocationId: entry.officeLocationId,
             },
           );
+          // Idempotent server-side (no-ops if already attached) — safe to
+          // resend even if the attendance insert above was itself a no-op
+          // replay of an already-synced entry.
+          if (entry.selfieBlob) {
+            await this.selfieService.uploadForAttendance(entry.clientEventId, entry.selfieBlob);
+          }
           await withStore('readwrite', (store) => store.delete(entry.clientEventId));
         } catch (err) {
           if (err instanceof UnauthorizedError) {

@@ -17,12 +17,18 @@ import { FaceService } from '../../core/face.service';
 import { OfflineError } from '../../core/local-api.service';
 import { OfflineQueueService } from '../../core/offline-queue.service';
 import { WebauthnService } from '../../core/webauthn.service';
+import { SelfieCaptureComponent } from '../selfie-capture/selfie-capture.component';
 
-type Status = 'idle' | 'camera' | 'scanning' | 'verifying' | 'error';
+type Status = 'idle' | 'camera' | 'scanning' | 'verifying' | 'selfie' | 'error';
+
+export interface BiometricConfirmResult {
+  method: BiometricMethod;
+  selfieBlob: Blob | null;
+}
 
 @Component({
   selector: 'app-biometric-modal',
-  imports: [],
+  imports: [SelfieCaptureComponent],
   templateUrl: './biometric-modal.component.html',
   styleUrl: './biometric-modal.component.scss',
 })
@@ -35,9 +41,13 @@ export class BiometricModalComponent implements OnInit, OnDestroy {
 
   readonly action = input.required<'login' | 'logout'>();
   readonly availableMethods = input.required<BiometricMethod[]>();
+  /** From the employee's own record (auth.user()) — whether they must record a video selfie to complete this, vs. it being an optional extra step. */
+  readonly requireSelfieVerification = input(false);
 
-  readonly success = output<BiometricMethod>();
+  readonly success = output<BiometricConfirmResult>();
   readonly cancel = output<void>();
+
+  private verifiedMethod: BiometricMethod | null = null;
 
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
 
@@ -100,7 +110,8 @@ export class BiometricModalComponent implements OnInit, OnDestroy {
       const matched = await this.verifyFace(user.id, descriptor);
       if (matched) {
         this.stopCamera();
-        this.success.emit('face');
+        this.verifiedMethod = 'face';
+        this.status.set('selfie');
       } else {
         this.status.set('camera');
         this.errorMessage.set("Face didn't match. Try again with better lighting.");
@@ -136,7 +147,8 @@ export class BiometricModalComponent implements OnInit, OnDestroy {
     this.status.set('verifying');
     try {
       await this.webauthnService.authenticate();
-      this.success.emit('fingerprint');
+      this.verifiedMethod = 'fingerprint';
+      this.status.set('selfie');
     } catch (err) {
       this.status.set('error');
       const userId = this.auth.user()?.id;
@@ -148,6 +160,16 @@ export class BiometricModalComponent implements OnInit, OnDestroy {
         this.errorMessage.set(err instanceof Error ? err.message : 'Fingerprint check failed.');
       }
     }
+  }
+
+  onSelfieCaptured(blob: Blob) {
+    if (!this.verifiedMethod) return;
+    this.success.emit({ method: this.verifiedMethod, selfieBlob: blob });
+  }
+
+  onSelfieSkipped() {
+    if (!this.verifiedMethod) return;
+    this.success.emit({ method: this.verifiedMethod, selfieBlob: null });
   }
 
   retry() {

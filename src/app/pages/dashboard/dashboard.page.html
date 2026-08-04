@@ -150,6 +150,7 @@
     <app-biometric-modal
       [action]="nextAction()"
       [availableMethods]="availableMethods()"
+      [requireSelfieVerification]="requireSelfieVerification()"
       (success)="onSuccess($event)"
       (cancel)="onCancel()"
     />
