@@ -21,6 +21,7 @@ export interface PendingAttendanceEntry {
   latitude?: number;
   longitude?: number;
   occurredAt: string;
+  officeLocationId?: number;
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -104,12 +105,14 @@ export class OfflineQueueService {
     position: Coordinates | undefined,
     occurredAt: string,
     clientEventId: string,
+    officeLocationId?: number,
   ): Promise<{ queued: boolean }> {
     if (this.effectiveOnline()) {
       try {
         await this.attendanceService.logEvent(userId, action, method, position, {
           occurredAt,
           clientEventId,
+          officeLocationId,
         });
         return { queued: false };
       } catch {
@@ -127,6 +130,7 @@ export class OfflineQueueService {
       latitude: position?.latitude,
       longitude: position?.longitude,
       occurredAt,
+      officeLocationId,
     });
     return { queued: true };
   }
@@ -163,7 +167,12 @@ export class OfflineQueueService {
             entry.latitude !== undefined && entry.longitude !== undefined
               ? { latitude: entry.latitude, longitude: entry.longitude }
               : undefined,
-            { occurredAt: entry.occurredAt, clientEventId: entry.clientEventId, offlineSync: true },
+            {
+              occurredAt: entry.occurredAt,
+              clientEventId: entry.clientEventId,
+              offlineSync: true,
+              officeLocationId: entry.officeLocationId,
+            },
           );
           await withStore('readwrite', (store) => store.delete(entry.clientEventId));
         } catch (err) {

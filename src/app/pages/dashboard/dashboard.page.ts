@@ -8,6 +8,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import {
@@ -29,7 +30,7 @@ const GEOFENCE_MAX_RADIUS_METERS = 10;
 
 @Component({
   selector: 'app-dashboard-page',
-  imports: [DatePipe, BiometricModalComponent, UserAvatarComponent],
+  imports: [DatePipe, FormsModule, BiometricModalComponent, UserAvatarComponent],
   templateUrl: './dashboard.page.html',
   styleUrl: './dashboard.page.scss',
 })
@@ -102,8 +103,22 @@ export class DashboardPage implements OnDestroy {
     return best;
   });
 
+  /** Manual branch pick for "All locations" users — lets them correct an automatic nearest-office guess that GPS got wrong (easily off by more than the geofence radius, especially indoors). */
+  readonly selectedOfficeLocationId = signal<number | null>(null);
+  readonly selectedOfficeLocation = computed<AssignedOfficeLocation | null>(() => {
+    const id = this.selectedOfficeLocationId();
+    if (id === null) return null;
+    return this.allOfficeLocations().find((o) => o.id === id) ?? null;
+  });
+
   readonly officeLocation = computed(
-    () => this.assignedOfficeLocation() ?? this.nearestOfficeLocation(),
+    () =>
+      this.assignedOfficeLocation() ?? this.selectedOfficeLocation() ?? this.nearestOfficeLocation(),
+  );
+
+  /** Whether to show the manual branch picker at all — only meaningful for "All locations" users with more than one branch to choose from. */
+  readonly showOfficePicker = computed(
+    () => !this.assignedOfficeLocation() && this.allOfficeLocations().length > 1,
   );
 
   readonly geofenceMinLabel = GeoService.formatDistance(GEOFENCE_MIN_RADIUS_METERS);
@@ -193,6 +208,10 @@ export class DashboardPage implements OnDestroy {
     return raw ? (JSON.parse(raw) as { action: AttendanceAction | null; at: string | null }) : null;
   }
 
+  selectOfficeLocation(rawId: string) {
+    this.selectedOfficeLocationId.set(rawId === '' ? null : Number(rawId));
+  }
+
   openModal() {
     this.justLogged.set(null);
     this.modalOpen.set(true);
@@ -219,6 +238,7 @@ export class DashboardPage implements OnDestroy {
       this.position() ?? undefined,
       occurredAt,
       clientEventId,
+      this.officeLocation()?.id,
     );
     this.justLogged.set({ action, method, queued });
   }

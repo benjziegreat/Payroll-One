@@ -21,6 +21,8 @@ export interface LogEventOptions {
   occurredAt?: string;
   /** Idempotency key so a retried offline sync can't double-insert. */
   clientEventId?: string;
+  /** For "All locations" users: which branch they said they're at, checked against instead of an automatic nearest-office guess. Ignored server-side for users with a fixed office assignment. */
+  officeLocationId?: number;
   /**
    * True only for OfflineQueueService's deferred retry of an already-queued
    * entry — never for the initial live attempt. Tells the server to trust
@@ -58,6 +60,7 @@ export class AttendanceService {
           occurredAt: options?.occurredAt,
           clientEventId: options?.clientEventId,
           offlineSync: options?.offlineSync,
+          officeLocationId: options?.officeLocationId,
         },
       });
       return;

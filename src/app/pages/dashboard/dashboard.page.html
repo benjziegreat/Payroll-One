@@ -88,6 +88,23 @@
           </p>
         }
 
+        @if (showOfficePicker()) {
+          <div class="field text-center">
+            <label for="officeLocation">Which branch are you at?</label>
+            <select
+              id="officeLocation"
+              class="input"
+              [ngModel]="officeLocation()?.id ?? ''"
+              (ngModelChange)="selectOfficeLocation($event)"
+            >
+              <option value="" disabled>Choose your branch</option>
+              @for (office of allOfficeLocations(); track office.id) {
+                <option [value]="office.id">{{ office.name }}</option>
+              }
+            </select>
+          </div>
+        }
+
         @if (officeLocation()) {
           @if (distanceLabel() !== null) {
             <p [class]="withinRange() ? 'success' : 'error'">

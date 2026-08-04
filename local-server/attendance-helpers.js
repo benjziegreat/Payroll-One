@@ -16,7 +16,7 @@ function nearestOffice(offices, latitude, longitude) {
   return best;
 }
 
-async function checkGeofence(pool, userId, latitude, longitude) {
+async function checkGeofence(pool, userId, latitude, longitude, selectedOfficeLocationId) {
   const [userRows] = await pool.query(
     'SELECT bypass_geofence, office_location_id FROM users WHERE id = ?',
     [userId],
@@ -28,13 +28,24 @@ async function checkGeofence(pool, userId, latitude, longitude) {
   let office = null;
 
   if (officeLocationId) {
+    // A fixed assignment always wins — a client-sent selection only matters
+    // for "All locations" users below, never as an override of this.
     const [officeRows] = await pool.query(
       'SELECT name, latitude, longitude FROM office_locations WHERE id = ?',
       [officeLocationId],
     );
     office = officeRows[0] ?? null;
+  } else if (selectedOfficeLocationId) {
+    // "All locations" — the employee picked which branch they're at,
+    // rather than leaving it to an automatic nearest-office guess (GPS can
+    // easily be off by more than the geofence radius, especially indoors).
+    const [officeRows] = await pool.query(
+      'SELECT name, latitude, longitude FROM office_locations WHERE id = ?',
+      [selectedOfficeLocationId],
+    );
+    office = officeRows[0] ?? null;
   } else {
-    // Assigned to "All locations" — geofence against whichever office is
+    // "All locations", nothing selected — fall back to whichever office is
     // nearest to where they actually are, instead of skipping the check
     // entirely.
     const [offices] = await pool.query(

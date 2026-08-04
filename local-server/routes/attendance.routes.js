@@ -12,9 +12,15 @@ const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 const MAX_OCCURRED_AT_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 router.post('/', async (req, res) => {
-  const { action, method, latitude, longitude, occurredAt, clientEventId, offlineSync } = req.body || {};
+  const { action, method, latitude, longitude, occurredAt, clientEventId, offlineSync, officeLocationId } =
+    req.body || {};
   if (!['login', 'logout'].includes(action) || !['face', 'fingerprint'].includes(method)) {
     res.status(400).json({ error: 'Invalid action or method' });
+    return;
+  }
+
+  if (officeLocationId !== undefined && typeof officeLocationId !== 'number') {
+    res.status(400).json({ error: 'officeLocationId must be a number' });
     return;
   }
 
@@ -56,7 +62,7 @@ router.post('/', async (req, res) => {
   // retried into passing. The live, first-attempt path below still enforces
   // it normally.
   if (!offlineSync) {
-    const geofence = await checkGeofence(pool, req.userId, latitude, longitude);
+    const geofence = await checkGeofence(pool, req.userId, latitude, longitude, officeLocationId);
     if (!geofence.ok) {
       res.status(geofence.status).json({ error: geofence.error, distance: geofence.distance });
       return;
