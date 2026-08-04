@@ -5,7 +5,7 @@ import {
   type BiometricMethod,
 } from './attendance.service';
 import type { Coordinates } from './geo.service';
-import { UnauthorizedError } from './local-api.service';
+import { OfflineError, UnauthorizedError } from './local-api.service';
 import { SelfieService } from './selfie.service';
 
 const DB_NAME = 'payroll_one_offline';
@@ -25,6 +25,8 @@ export interface PendingAttendanceEntry {
   officeLocationId?: number;
   /** A recorded video selfie still waiting to be attached — see SelfieService. Stored directly in IndexedDB (Blobs are structured-clone-safe in modern browsers). */
   selfieBlob?: Blob;
+  /** selfieBlob.type as captured when it was recorded — Safari resets a Blob's .type to "text/plain" after an IndexedDB round trip, so this is what SelfieService actually uploads with, not blob.type at flush time. */
+  selfieMimeType?: string;
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -140,6 +142,7 @@ export class OfflineQueueService {
               occurredAt,
               officeLocationId,
               selfieBlob,
+              selfieMimeType: selfieBlob.type,
             });
           }
         }
@@ -161,6 +164,7 @@ export class OfflineQueueService {
       occurredAt,
       officeLocationId,
       selfieBlob: selfieBlob ?? undefined,
+      selfieMimeType: selfieBlob?.type,
     });
     return { queued: true };
   }
@@ -208,7 +212,22 @@ export class OfflineQueueService {
           // resend even if the attendance insert above was itself a no-op
           // replay of an already-synced entry.
           if (entry.selfieBlob) {
-            await this.selfieService.uploadForAttendance(entry.clientEventId, entry.selfieBlob);
+            try {
+              await this.selfieService.uploadForAttendance(
+                entry.clientEventId,
+                entry.selfieBlob,
+                entry.selfieMimeType,
+              );
+            } catch (err) {
+              if (err instanceof OfflineError) throw err;
+              // The attendance log above already synced — only the selfie
+              // attach was rejected, and by the server itself (not a
+              // connectivity issue), so retrying it would fail the exact
+              // same way forever. Drop just the selfie rather than
+              // blocking every entry queued behind this one indefinitely.
+              await withStore('readwrite', (store) => store.delete(entry.clientEventId));
+              continue;
+            }
           }
           await withStore('readwrite', (store) => store.delete(entry.clientEventId));
         } catch (err) {

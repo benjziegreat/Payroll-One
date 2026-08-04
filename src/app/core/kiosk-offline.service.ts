@@ -28,6 +28,8 @@ interface PendingKioskEntry {
 interface PendingSelfieEntry {
   clientEventId: string;
   blob: Blob;
+  /** blob.type as captured when it was recorded — Safari resets a Blob's .type to "text/plain" after an IndexedDB round trip, so this is what SelfieService actually uploads with, not blob.type at flush time. */
+  mimeType: string;
 }
 
 export interface OfflineMatch {
@@ -260,7 +262,7 @@ export class KioskOfflineService {
   /** Queues a recorded selfie video to attach to a kiosk attendance log by clientEventId — independent of the identify/sync queue above, so it retries with plain connectivity and doesn't depend on offline kiosk mode being enabled (the selfie-attach endpoint has no such gate). */
   async queueSelfie(clientEventId: string, blob: Blob) {
     await withStore(PENDING_SELFIE_STORE, 'readwrite', (store) =>
-      store.put({ clientEventId, blob }),
+      store.put({ clientEventId, blob, mimeType: blob.type }),
     );
     await this.refreshPendingCount();
   }
@@ -314,7 +316,7 @@ export class KioskOfflineService {
       );
       for (const selfie of selfies) {
         try {
-          await this.selfieService.uploadForKiosk(selfie.clientEventId, selfie.blob);
+          await this.selfieService.uploadForKiosk(selfie.clientEventId, selfie.blob, selfie.mimeType);
           await withStore(PENDING_SELFIE_STORE, 'readwrite', (store) =>
             store.delete(selfie.clientEventId),
           );
