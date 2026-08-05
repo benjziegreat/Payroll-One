@@ -112,7 +112,15 @@ export class SelfieCaptureComponent implements OnInit, OnDestroy {
   }
 
   private finishRecording(mimeType: string) {
-    this.recordedBlob = new Blob(this.chunks, { type: mimeType });
+    // MediaRecorder needs the full mimeType (codecs and all) to encode
+    // correctly, but the recorded Blob only needs the base type — codecs
+    // like "vp8,opus" contain an unquoted comma that busboy's Content-Type
+    // parser can't handle, so an upload carrying it verbatim gets its
+    // mimetype silently reported as "text/plain" server-side and rejected.
+    // Stripping it here means a bad Content-Type is never produced at all,
+    // rather than trying to survive it downstream.
+    const baseType = mimeType.split(';')[0].trim();
+    this.recordedBlob = new Blob(this.chunks, { type: baseType });
     this.stopCamera();
     this.status.set('preview');
     setTimeout(() => {
